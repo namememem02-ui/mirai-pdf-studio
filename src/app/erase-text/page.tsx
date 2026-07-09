@@ -26,7 +26,15 @@ interface EditablePageProps {
   pdfDoc: any;
   eraserInstances: EraserInstance[];
   activeColor: string;
-  onAddEraser: (pageIndex: number, x: number, y: number, renderedWidth: number, renderedHeight: number) => void;
+  onAddEraser: (
+    pageIndex: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    renderedWidth: number,
+    renderedHeight: number
+  ) => void;
   onUpdateWidth: (id: string, width: number) => void;
   onUpdateHeight: (id: string, height: number) => void;
   onUpdateColor: (id: string, color: string) => void;
@@ -49,6 +57,11 @@ function EditablePage({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
+
+  // States for click & drag rectangle drawing
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
+  const [drawRect, setDrawRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -78,11 +91,66 @@ function EditablePage({
     };
   }, [pdfDoc, pageNumber]);
 
-  const handlePageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent starting a draw if clicking on existing stamps / control popovers
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    onAddEraser(pageNumber - 1, x, y, dimensions.width, dimensions.height);
+    const startX = e.clientX - rect.left;
+    const startY = e.clientY - rect.top;
+
+    setIsDrawing(true);
+    setStartPos({ x: startX, y: startY });
+    setDrawRect({ x: startX, y: startY, width: 0, height: 0 });
+
+    const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
+      const currentX = moveEvent.clientX - rect.left;
+      const currentY = moveEvent.clientY - rect.top;
+
+      // Constrain within page boundaries
+      const boundedX = Math.max(0, Math.min(rect.width, currentX));
+      const boundedY = Math.max(0, Math.min(rect.height, currentY));
+
+      const x = Math.min(startX, boundedX);
+      const y = Math.min(startY, boundedY);
+      const w = Math.abs(boundedX - startX);
+      const h = Math.abs(boundedY - startY);
+
+      setDrawRect({ x, y, width: w, height: h });
+    };
+
+    const handleGlobalMouseUp = (upEvent: MouseEvent) => {
+      document.removeEventListener('mousemove', handleGlobalMouseMove);
+      document.removeEventListener('mouseup', handleGlobalMouseUp);
+
+      setIsDrawing(false);
+      setStartPos(null);
+      setDrawRect(null);
+
+      const finalRect = rect;
+      const endX = upEvent.clientX - finalRect.left;
+      const endY = upEvent.clientY - finalRect.top;
+
+      const boundedEndX = Math.max(0, Math.min(finalRect.width, endX));
+      const boundedEndY = Math.max(0, Math.min(finalRect.height, endY));
+
+      const w = Math.abs(boundedEndX - startX);
+      const h = Math.abs(boundedEndY - startY);
+
+      const x = Math.min(startX, boundedEndX);
+      const y = Math.min(startY, boundedEndY);
+
+      if (w < 6 && h < 6) {
+        // It's a simple click! Place a default eraser (100x25) centered at click
+        onAddEraser(pageNumber - 1, startX, startY, 100, 25, finalRect.width, finalRect.height);
+      } else {
+        // Place drag-drawn box
+        const centerX = x + w / 2;
+        const centerY = y + h / 2;
+        onAddEraser(pageNumber - 1, centerX, centerY, w, h, finalRect.width, finalRect.height);
+      }
+    };
+
+    document.addEventListener('mousemove', handleGlobalMouseMove);
+    document.addEventListener('mouseup', handleGlobalMouseUp);
   };
 
   return (
@@ -91,7 +159,7 @@ function EditablePage({
       <div
         className="relative border border-gray-300 bg-white shadow-md select-none mb-8 cursor-crosshair"
         style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
-        onClick={handlePageClick}
+        onMouseDown={handleMouseDown}
       >
         <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
 
@@ -99,6 +167,21 @@ function EditablePage({
           <div className="absolute inset-0 bg-gray-50/50 flex items-center justify-center text-xs text-gray-500">
             ⏳ กำลังโหลดกระดาษ...
           </div>
+        )}
+
+        {/* Real-time Drawing Box Preview Overlay */}
+        {isDrawing && drawRect && (
+          <div
+            className="absolute border border-dashed border-yellow-500 z-50 pointer-events-none"
+            style={{
+              left: `${drawRect.x}px`,
+              top: `${drawRect.y}px`,
+              width: `${drawRect.width}px`,
+              height: `${drawRect.height}px`,
+              backgroundColor: activeColor,
+              opacity: 0.65,
+            }}
+          />
         )}
 
         {eraserInstances.map((inst) => (
@@ -240,14 +323,22 @@ export default function EraseTextPage() {
     }
   };
 
-  const handleAddEraser = (pageIndex: number, x: number, y: number, rWidth: number, rHeight: number) => {
+  const handleAddEraser = (
+    pageIndex: number,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    rWidth: number,
+    rHeight: number
+  ) => {
     const newInst: EraserInstance = {
       id: `eraser-${Date.now()}-${Math.random()}`,
       pageIndex,
       x,
       y,
-      width: 100, // Default width
-      height: 25, // Default height
+      width,
+      height,
       color: activeColor,
       renderedWidth: rWidth,
       renderedHeight: rHeight,
@@ -481,7 +572,7 @@ export default function EraseTextPage() {
             {/* Stamping Grid pages preview */}
             <div className="lg:col-span-8 flex flex-col items-center">
               <div className="w-full bg-yellow-50 text-yellow-800 rounded-lg p-3.5 border border-yellow-100 text-xs font-semibold text-center mb-5 shadow-sm leading-relaxed">
-                <p>👉 **แตะ/คลิกเมาส์** ตรงตำแหน่งข้อความที่ต้องการลบเพื่อ **วางกรอบยางลบ** | ปรับแต่งความกว้าง/ความสูงให้พอดีกับขนาดรอยคำได้ในเมนูป๊อปอัป</p>
+                <p>👉 **คลิกค้างแล้วลากเมาส์** บนหน้ากระดาษเพื่อ **ตีกรอบสี่เหลี่ยมยางลบ** ขนาดตามต้องการทันที (หรือคลิกเฉย ๆ เพื่อวางกล่องขนาดมาตรฐาน 100x25 ก็ได้เช่นกัน)</p>
               </div>
 
               <div className="w-full max-h-[750px] overflow-y-auto pr-2 space-y-4">
