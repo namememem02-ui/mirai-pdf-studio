@@ -16,13 +16,6 @@ export const TOOLS: ToolInfo[] = [
     color: 'bg-indigo-100',
   },
   {
-    id: 'edit-text',
-    name: 'แก้ไขข้อความ PDF',
-    description: 'พิมพ์เขียนข้อความ แทรกกล่องข้อความทับลงบนหน้ากระดาษ PDF (Form Filler)',
-    icon: '✍️',
-    color: 'bg-blue-100',
-  },
-  {
     id: 'merge',
     name: 'รวม PDF',
     description: 'รวม PDF หลายไฟล์เป็นไฟล์เดียว จัดลำดับได้ตามต้องการ',
