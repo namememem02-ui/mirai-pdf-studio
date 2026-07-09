@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 interface MergeItem {
   file: File;
@@ -13,6 +14,7 @@ interface MergeItem {
 }
 
 export default function MergePage() {
+  const { addToQueue } = useDownloadQueue();
   const [items, setItems] = useState<MergeItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
@@ -85,7 +87,10 @@ export default function MergePage() {
         const pages = await out.copyPages(src, src.getPageIndices());
         pages.forEach((p) => out.addPage(p));
       }
-      downloadBlob(await out.save(), 'merged.pdf');
+      const mergedBytes = await out.save();
+      const blob = new Blob([mergedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue('merged.pdf', blob);
+      downloadBlob(mergedBytes, 'merged.pdf');
       setDone(true);
     } catch (e) {
       setError('รวมไฟล์ไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไฟล์อาจเสียหายหรือถูกล็อก'));

@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 interface PageThumbnail {
   index: number;
@@ -13,6 +14,7 @@ interface PageThumbnail {
 }
 
 export default function RotatePage() {
+  const { addToQueue } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [pages, setPages] = useState<PageThumbnail[]>([]);
@@ -104,7 +106,11 @@ export default function RotatePage() {
           page.setRotation(degrees((page.getRotation().angle + angle) % 360));
         }
       }
-      downloadBlob(await doc.save(), `${baseName(file.name)}_rotated.pdf`);
+      const outName = `${baseName(file.name)}_rotated.pdf`;
+      const outBytes = await doc.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue(outName, blob);
+      downloadBlob(outBytes, outName);
       setDone(true);
     } catch (e) {
       setError('หมุนหน้าไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ'));

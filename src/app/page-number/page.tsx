@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 type NumberPosition =
   | 'top-left'
@@ -16,6 +17,7 @@ type NumberPosition =
   | 'bottom-right';
 
 export default function PageNumberPage() {
+  const { addToQueue } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
@@ -174,7 +176,11 @@ export default function PageNumberPage() {
         });
       }
 
-      downloadBlob(await doc.save(), `${baseName(file.name)}_numbered.pdf`);
+      const outName = `${baseName(file.name)}_numbered.pdf`;
+      const outBytes = await doc.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue(outName, blob);
+      downloadBlob(outBytes, outName);
       setDone(true);
     } catch (err) {
       setError('ปั๊มเลขหน้าไม่สำเร็จ: ' + (err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'));

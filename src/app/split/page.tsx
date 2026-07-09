@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, parsePageRanges, pageIndicesToRangeString, baseName } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 interface PageThumbnail {
   index: number;
@@ -13,6 +14,7 @@ interface PageThumbnail {
 }
 
 export default function SplitPage() {
+  const { addToQueue } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [pages, setPages] = useState<PageThumbnail[]>([]);
@@ -124,7 +126,11 @@ export default function SplitPage() {
       const out = await PDFDocument.create();
       const pagesToCopy = await out.copyPages(src, selectedPages);
       pagesToCopy.forEach((p) => out.addPage(p));
-      downloadBlob(await out.save(), `${baseName(file.name)}_selected.pdf`);
+      const outName = `${baseName(file.name)}_selected.pdf`;
+      const outBytes = await out.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue(outName, blob);
+      downloadBlob(outBytes, outName);
       setDone(true);
     } catch (e) {
       setError('แยกหน้าไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ'));

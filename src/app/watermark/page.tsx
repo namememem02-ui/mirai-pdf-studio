@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 type WatermarkPosition =
   | 'top-left'
@@ -19,6 +20,7 @@ type WatermarkPosition =
   | 'bottom-right';
 
 export default function WatermarkPage() {
+  const { addToQueue } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -196,7 +198,11 @@ export default function WatermarkPage() {
         });
       }
 
-      downloadBlob(await doc.save(), `${baseName(file.name)}_watermarked.pdf`);
+      const outName = `${baseName(file.name)}_watermarked.pdf`;
+      const outBytes = await doc.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue(outName, blob);
+      downloadBlob(outBytes, outName);
       setDone(true);
     } catch (err) {
       setError('ปั๊มลายน้ำไม่สำเร็จ: ' + (err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'));

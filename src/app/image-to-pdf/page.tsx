@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { downloadBlob } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 interface ImageItem {
   file: File;
@@ -15,6 +16,7 @@ interface ImageItem {
 const OK_TYPES = ['image/jpeg', 'image/png'];
 
 export default function ImageToPdfPage() {
+  const { addToQueue } = useDownloadQueue();
   const [items, setItems] = useState<ImageItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -74,7 +76,10 @@ export default function ImageToPdfPage() {
         const page = doc.addPage([img.width, img.height]);
         page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
       }
-      downloadBlob(await doc.save(), 'images.pdf');
+      const outBytes = await doc.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue('images.pdf', blob);
+      downloadBlob(outBytes, 'images.pdf');
       setDone(true);
     } catch (e) {
       setError('แปลงไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไฟล์รูปอาจเสียหาย'));

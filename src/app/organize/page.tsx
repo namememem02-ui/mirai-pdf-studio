@@ -6,6 +6,7 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 interface OrganizePageItem {
   id: string; // React key
@@ -20,6 +21,7 @@ interface OrganizePageItem {
 }
 
 export default function OrganizePage() {
+  const { addToQueue } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [items, setItems] = useState<OrganizePageItem[]>([]);
@@ -239,7 +241,10 @@ export default function OrganizePage() {
       }
 
       const outName = file ? `${baseName(file.name)}_organized.pdf` : 'organized.pdf';
-      downloadBlob(await out.save(), outName);
+      const outBytes = await out.save();
+      const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
+      addToQueue(outName, blob);
+      downloadBlob(outBytes, outName);
       setDone(true);
     } catch (err) {
       setError('ประมวลผลบันทึกไฟล์ไม่สำเร็จ: ' + (err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'));
