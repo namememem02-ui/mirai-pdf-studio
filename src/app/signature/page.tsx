@@ -411,8 +411,12 @@ export default function SignaturePage() {
         }
 
         // Convert HTML viewport pixels coordinates to PDF bottom-left origin coordinates
-        const pdfX = (sig.x / sig.renderedWidth) * width;
-        const pdfY = ((sig.renderedHeight - sig.y - sig.height) / sig.renderedHeight) * height;
+        // HTML signature is centered at (sig.x, sig.y) due to transform: translate(-50%, -50%)
+        const sigLeft = sig.x - sig.width / 2;
+        const sigTop = sig.y - sig.height / 2;
+
+        const pdfX = (sigLeft / sig.renderedWidth) * width;
+        const pdfY = ((sig.renderedHeight - sigTop - sig.height) / sig.renderedHeight) * height;
         const pdfWidth = (sig.width / sig.renderedWidth) * width;
         const pdfHeight = (sig.height / sig.renderedHeight) * height;
 
