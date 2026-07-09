@@ -211,7 +211,7 @@ export default function OrganizePage() {
       for (const item of items) {
         if (item.type === 'pdf' && item.fileId && item.originalIndex !== undefined) {
           const buffer = loadedBuffers[item.fileId];
-          const srcDoc = await PDFDocument.load(buffer, { ignoreEncryption: true });
+          const srcDoc = await PDFDocument.load(buffer.slice(0), { ignoreEncryption: true });
           const [copiedPage] = await out.copyPages(srcDoc, [item.originalIndex]);
           
           // Apply custom rotation
