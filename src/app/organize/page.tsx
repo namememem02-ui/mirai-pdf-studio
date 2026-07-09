@@ -57,7 +57,7 @@ export default function OrganizePage() {
       }));
 
       const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({ data: buffer }).promise;
+      const doc = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
       const count = doc.numPages;
 
       const newItems: OrganizePageItem[] = [];
