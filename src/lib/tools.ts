@@ -9,6 +9,13 @@ export interface ToolInfo {
 
 export const TOOLS: ToolInfo[] = [
   {
+    id: 'organize',
+    name: 'จัดระเบียบหน้า PDF',
+    description: 'จัดหน้า โยกย้าย หมุน ลบ แทรกหน้าว่าง หรือแทรกไฟล์ PDF/รูปภาพ แบบ PDFgear',
+    icon: '📋',
+    color: 'bg-indigo-100',
+  },
+  {
     id: 'merge',
     name: 'รวม PDF',
     description: 'รวม PDF หลายไฟล์เป็นไฟล์เดียว จัดลำดับได้ตามต้องการ',
