@@ -6,7 +6,8 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob } from '@/lib/pdf';
-import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
+import PDFPreviewModal from '@/components/PDFPreviewModal';
 
 interface MergeItem {
   file: File;
@@ -14,12 +15,14 @@ interface MergeItem {
 }
 
 export default function MergePage() {
-  const { addToQueue } = useDownloadQueue();
+  const { addToQueue, queue, downloadItem } = useDownloadQueue();
   const [items, setItems] = useState<MergeItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [resultItemId, setResultItemId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
   const addFiles = async (incoming: File[]) => {
     const pdfs = incoming.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
@@ -80,6 +83,8 @@ export default function MergePage() {
   const merge = async () => {
     setBusy(true);
     setError(null);
+    setDone(false);
+    setResultItemId(null);
     try {
       const out = await PDFDocument.create();
       for (const item of items) {
@@ -89,8 +94,8 @@ export default function MergePage() {
       }
       const mergedBytes = await out.save();
       const blob = new Blob([mergedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-      addToQueue('merged.pdf', blob);
-      downloadBlob(mergedBytes, 'merged.pdf');
+      const id = addToQueue('merged.pdf', blob);
+      setResultItemId(id);
       setDone(true);
     } catch (e) {
       setError('รวมไฟล์ไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไฟล์อาจเสียหายหรือถูกล็อก'));
@@ -180,13 +185,45 @@ export default function MergePage() {
           </div>
         )}
 
-        {done && <p className="text-green-600 text-sm font-semibold">✅ รวมไฟล์สำเร็จ — ดาวน์โหลดไฟล์เรียบร้อยแล้ว!</p>}
+        {done && resultItemId && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-4 shadow-sm animate-fadeIn">
+            <span className="text-4xl block">🎉</span>
+            <h3 className="font-bold text-emerald-800 text-sm">รวมไฟล์ PDF เสร็จเรียบร้อยแล้ว!</h3>
+            <p className="text-xs text-emerald-600">ตรวจสอบความถูกต้องผ่านพรีวิวก่อนเปิดดาวน์โหลดลงเครื่องได้ทันที</p>
+            
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  const item = queue.find((q) => q.id === resultItemId);
+                  if (item) setPreviewItem(item);
+                }}
+                className="px-4 py-2 border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                👁️ พรีวิวไฟล์ผลลัพธ์
+              </button>
+              <button
+                onClick={() => downloadItem(resultItemId)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                📥 ดาวน์โหลดไฟล์ทันที
+              </button>
+            </div>
+          </div>
+        )}
 
         <ActionButton onClick={merge} disabled={items.length < 2 || busy} busy={busy}>
-          🗂️ ดาวน์โหลดไฟล์ PDF ที่รวมเรียบร้อย ({items.length} ไฟล์)
+          🗂️ เริ่มประมวลผลการรวมไฟล์ ({items.length} ไฟล์)
         </ActionButton>
         {items.length === 1 && <p className="text-center text-xs text-gray-400 mt-2">กรุณาเพิ่มอย่างน้อย 2 ไฟล์เพื่อรวมข้อมูล</p>}
       </div>
+
+      {previewItem && (
+        <PDFPreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+          onDownload={() => downloadItem(previewItem.id)}
+        />
+      )}
     </main>
   );
 }

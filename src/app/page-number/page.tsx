@@ -6,7 +6,8 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
-import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
+import PDFPreviewModal from '@/components/PDFPreviewModal';
 
 type NumberPosition =
   | 'top-left'
@@ -17,11 +18,13 @@ type NumberPosition =
   | 'bottom-right';
 
 export default function PageNumberPage() {
-  const { addToQueue } = useDownloadQueue();
+  const { addToQueue, queue, downloadItem } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [resultItemId, setResultItemId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
   // Settings
   const [format, setFormat] = useState('{page} / {total}');
@@ -179,8 +182,8 @@ export default function PageNumberPage() {
       const outName = `${baseName(file.name)}_numbered.pdf`;
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-      addToQueue(outName, blob);
-      downloadBlob(outBytes, outName);
+      const id = addToQueue(outName, blob);
+      setResultItemId(id);
       setDone(true);
     } catch (err) {
       setError('ปั๊มเลขหน้าไม่สำเร็จ: ' + (err instanceof Error ? err.message : 'ไม่ทราบสาเหตุ'));
@@ -330,12 +333,44 @@ export default function PageNumberPage() {
           </div>
         )}
 
-        {done && <p className="text-green-600 text-sm font-semibold">✅ ใส่เลขหน้าสำเร็จ — ดาวน์โหลดไฟล์เรียบร้อยแล้ว!</p>}
+        {done && resultItemId && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-4 shadow-sm animate-fadeIn">
+            <span className="text-4xl block">🎉</span>
+            <h3 className="font-bold text-emerald-800 text-sm">ใส่เลขหน้าลงบนเอกสาร PDF สำเร็จแล้ว!</h3>
+            <p className="text-xs text-emerald-600">ตรวจสอบความถูกต้องผ่านพรีวิวก่อนเปิดดาวน์โหลดลงเครื่องได้ทันที</p>
+            
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  const item = queue.find((q) => q.id === resultItemId);
+                  if (item) setPreviewItem(item);
+                }}
+                className="px-4 py-2 border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                👁️ พรีวิวไฟล์ผลลัพธ์
+              </button>
+              <button
+                onClick={() => downloadItem(resultItemId)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                📥 ดาวน์โหลดไฟล์ทันที
+              </button>
+            </div>
+          </div>
+        )}
 
         <ActionButton onClick={addPageNumbers} disabled={!file || busy} busy={busy}>
-          🔢 ใส่หมายเลขหน้าและดาวน์โหลดไฟล์ใหม่
+          🔢 เริ่มประมวลผลใส่หมายเลขหน้า PDF
         </ActionButton>
       </div>
+
+      {previewItem && (
+        <PDFPreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+          onDownload={() => downloadItem(previewItem.id)}
+        />
+      )}
     </main>
   );
 }

@@ -6,7 +6,8 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
-import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
+import PDFPreviewModal from '@/components/PDFPreviewModal';
 
 interface PageThumbnail {
   index: number;
@@ -14,7 +15,7 @@ interface PageThumbnail {
 }
 
 export default function RotatePage() {
-  const { addToQueue } = useDownloadQueue();
+  const { addToQueue, queue, downloadItem } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [pageCount, setPageCount] = useState(0);
   const [pages, setPages] = useState<PageThumbnail[]>([]);
@@ -23,6 +24,8 @@ export default function RotatePage() {
   const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [resultItemId, setResultItemId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
   const pick = async (files: File[]) => {
     const f = files[0];
@@ -97,6 +100,8 @@ export default function RotatePage() {
     if (!file) return;
     setBusy(true);
     setError(null);
+    setDone(false);
+    setResultItemId(null);
     try {
       const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
       for (let i = 0; i < pageCount; i++) {
@@ -109,8 +114,8 @@ export default function RotatePage() {
       const outName = `${baseName(file.name)}_rotated.pdf`;
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-      addToQueue(outName, blob);
-      downloadBlob(outBytes, outName);
+      const id = addToQueue(outName, blob);
+      setResultItemId(id);
       setDone(true);
     } catch (e) {
       setError('หมุนหน้าไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ'));
@@ -139,37 +144,27 @@ export default function RotatePage() {
         )}
 
         {file && pages.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+          <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
-              <span className="text-sm font-bold text-gray-700">หมุนไฟล์ร่วมกัน:</span>
+              <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">เครื่องมือหมุนหน้าด่วน:</span>
               <div className="flex gap-2">
                 <button
                   onClick={() => rotateAllPages(90)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition"
+                  className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold transition cursor-pointer"
                 >
                   🔄 หมุนทุกหน้า +90°
                 </button>
                 <button
                   onClick={() => rotateAllPages(180)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition"
+                  className="px-3.5 py-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-700 rounded-lg text-xs font-semibold transition cursor-pointer"
                 >
-                  🔄 กลับทุกหน้า 180°
+                  🔄 หมุนทุกหน้า +180°
                 </button>
                 <button
-                  onClick={() => rotateAllPages(270)}
-                  className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-400 transition"
+                  onClick={() => setRotations({})}
+                  className="px-3.5 py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg text-xs font-semibold transition cursor-pointer"
                 >
-                  🔄 หมุนทุกหน้า -90°
-                </button>
-                <button
-                  onClick={() => {
-                    const reset: Record<number, number> = {};
-                    for (let i = 0; i < pageCount; i++) reset[i] = 0;
-                    setRotations(reset);
-                  }}
-                  className="px-3 py-1.5 rounded-lg border border-red-200 text-xs font-semibold text-red-600 hover:bg-red-50 transition"
-                >
-                  ↩️ รีเซ็ตทั้งหมด
+                  ❌ รีเซ็ตทั้งหมด
                 </button>
               </div>
             </div>
@@ -179,7 +174,7 @@ export default function RotatePage() {
               {pages.map((p) => (
                 <div
                   key={p.index}
-                  className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col items-center relative group hover:shadow-md transition"
+                  className="border border-gray-200 bg-gray-50 hover:bg-gray-100/50 rounded-xl p-3 flex flex-col items-center justify-between hover:shadow transition relative select-none"
                 >
                   <div className="w-full aspect-[3/4] overflow-hidden flex items-center justify-center bg-white border border-gray-100 rounded-lg relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -209,12 +204,44 @@ export default function RotatePage() {
           </div>
         )}
 
-        {done && <p className="text-green-600 text-sm font-semibold">✅ หมุนหน้าสำเร็จ — ดาวน์โหลดไฟล์หมุนเรียบร้อยแล้ว!</p>}
+        {done && resultItemId && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-4 shadow-sm animate-fadeIn">
+            <span className="text-4xl block">🎉</span>
+            <h3 className="font-bold text-emerald-800 text-sm">หมุนหน้า PDF เสร็จเรียบร้อยแล้ว!</h3>
+            <p className="text-xs text-emerald-600">ตรวจสอบความถูกต้องผ่านพรีวิวก่อนเปิดดาวน์โหลดลงเครื่องได้ทันที</p>
+            
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  const item = queue.find((q) => q.id === resultItemId);
+                  if (item) setPreviewItem(item);
+                }}
+                className="px-4 py-2 border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                👁️ พรีวิวไฟล์ผลลัพธ์
+              </button>
+              <button
+                onClick={() => downloadItem(resultItemId)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                📥 ดาวน์โหลดไฟล์ทันที
+              </button>
+            </div>
+          </div>
+        )}
 
         <ActionButton onClick={rotatePdf} disabled={!file || busy} busy={busy}>
-          🔄 ดาวน์โหลดไฟล์ PDF ที่หมุนแล้ว
+          🔄 เริ่มประมวลผลหมุนหน้า PDF
         </ActionButton>
       </div>
+
+      {previewItem && (
+        <PDFPreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+          onDownload={() => downloadItem(previewItem.id)}
+        />
+      )}
     </main>
   );
 }

@@ -6,7 +6,8 @@ import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { downloadBlob } from '@/lib/pdf';
-import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
+import PDFPreviewModal from '@/components/PDFPreviewModal';
 
 interface ImageItem {
   file: File;
@@ -16,11 +17,13 @@ interface ImageItem {
 const OK_TYPES = ['image/jpeg', 'image/png'];
 
 export default function ImageToPdfPage() {
-  const { addToQueue } = useDownloadQueue();
+  const { addToQueue, queue, downloadItem } = useDownloadQueue();
   const [items, setItems] = useState<ImageItem[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [resultItemId, setResultItemId] = useState<string | null>(null);
+  const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
   // Clean up object URLs on unmount to prevent memory leaks
   useEffect(() => {
@@ -65,6 +68,8 @@ export default function ImageToPdfPage() {
   const convert = async () => {
     setBusy(true);
     setError(null);
+    setDone(false);
+    setResultItemId(null);
     try {
       const doc = await PDFDocument.create();
       for (const item of items) {
@@ -78,8 +83,8 @@ export default function ImageToPdfPage() {
       }
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
-      addToQueue('images.pdf', blob);
-      downloadBlob(outBytes, 'images.pdf');
+      const id = addToQueue('images.pdf', blob);
+      setResultItemId(id);
       setDone(true);
     } catch (e) {
       setError('แปลงไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไฟล์รูปอาจเสียหาย'));
@@ -96,47 +101,45 @@ export default function ImageToPdfPage() {
         <FileDropzone
           accept="image/jpeg,image/png,.jpg,.jpeg,.png"
           multiple
-          label="ลากรูปภาพมาวาง หรือคลิกเลือก (เลือกได้หลายรูป)"
-          hint="รองรับนามสกุล JPG และ PNG เท่านั้น"
+          label="ลากรูปภาพมาวาง หรือคลิกเลือก (JPG, PNG)"
           onFiles={addFiles}
         />
 
         {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
 
         {items.length > 0 && (
-          <div className="space-y-3">
-            <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">การ์ดตัวอย่างรูปภาพและจัดหน้า:</span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+              จัดคิวลำดับรูปภาพ ({items.length} รูป):
+            </span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
               {items.map((item, i) => (
                 <div
                   key={`${item.file.name}-${i}`}
-                  className="bg-white border border-gray-200 rounded-xl p-3 flex flex-col justify-between hover:shadow-md transition relative group"
+                  className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between hover:shadow transition relative select-none"
                 >
                   <div className="flex flex-col items-center">
-                    {/* Visual Image Thumbnail */}
-                    <div className="w-full aspect-[4/3] bg-gray-50 border border-gray-100 rounded flex items-center justify-center overflow-hidden mb-2 relative">
+                    <div className="w-full aspect-[3/4] overflow-hidden flex items-center justify-center bg-white border border-gray-100 rounded-lg">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.url} alt={`รูป ${item.file.name}`} className="max-w-full max-h-full object-contain" />
+                      <img src={item.url} alt={item.file.name} className="max-w-full max-h-full object-contain" />
                     </div>
-
-                    <p className="font-semibold text-[10px] text-gray-600 text-center truncate w-full px-1" title={item.file.name}>
+                    <p className="font-semibold text-[10px] text-gray-600 mt-2 text-center line-clamp-1 w-full" title={item.file.name}>
                       {i + 1}. {item.file.name}
                     </p>
                   </div>
 
-                  {/* Move Left / Right Overlay buttons */}
-                  <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-gray-50">
+                  <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-gray-200">
                     <button
                       onClick={() => move(i, -1)}
                       disabled={i === 0}
-                      className="px-2 py-1 rounded border border-gray-200 bg-gray-50 text-[10px] font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                      className="px-2 py-1 rounded border border-gray-200 bg-white text-[10px] font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                     >
                       ← ซ้าย
                     </button>
                     <button
                       onClick={() => move(i, 1)}
                       disabled={i === items.length - 1}
-                      className="px-2 py-1 rounded border border-gray-200 bg-gray-50 text-[10px] font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                      className="px-2 py-1 rounded border border-gray-200 bg-white text-[10px] font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                     >
                       ขวา →
                     </button>
@@ -154,12 +157,44 @@ export default function ImageToPdfPage() {
           </div>
         )}
 
-        {done && <p className="text-green-600 text-sm font-semibold">✅ แปลงสำเร็จ — ดาวน์โหลดไฟล์เรียบร้อยแล้ว (images.pdf)</p>}
+        {done && resultItemId && (
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-4 shadow-sm animate-fadeIn">
+            <span className="text-4xl block">🎉</span>
+            <h3 className="font-bold text-emerald-800 text-sm">แปลงไฟล์รูปภาพเป็น PDF สำเร็จแล้ว!</h3>
+            <p className="text-xs text-emerald-600">ตรวจสอบความถูกต้องผ่านพรีวิวก่อนเปิดดาวน์โหลดลงเครื่องได้ทันที</p>
+            
+            <div className="flex justify-center gap-3">
+              <button
+                onClick={() => {
+                  const item = queue.find((q) => q.id === resultItemId);
+                  if (item) setPreviewItem(item);
+                }}
+                className="px-4 py-2 border border-blue-200 bg-white hover:bg-blue-50 text-blue-600 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                👁️ พรีวิวไฟล์ผลลัพธ์
+              </button>
+              <button
+                onClick={() => downloadItem(resultItemId)}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer"
+              >
+                📥 ดาวน์โหลดไฟล์ทันที
+              </button>
+            </div>
+          </div>
+        )}
 
         <ActionButton onClick={convert} disabled={items.length === 0 || busy} busy={busy}>
-          🖼️ แปลง {items.length > 0 ? `${items.length} รูป` : ''} เป็น PDF
+          🖼️ เริ่มแปลงรูปภาพทั้งหมดเป็น PDF
         </ActionButton>
       </div>
+
+      {previewItem && (
+        <PDFPreviewModal
+          item={previewItem}
+          onClose={() => setPreviewItem(null)}
+          onDownload={() => downloadItem(previewItem.id)}
+        />
+      )}
     </main>
   );
 }
