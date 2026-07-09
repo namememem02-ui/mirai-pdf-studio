@@ -132,7 +132,10 @@ function EditablePage({
             </span>
 
             {/* Text Overlay Controls */}
-            <div className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-lg p-2.5 flex flex-col gap-2 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-56">
+            <div
+              className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-lg p-2.5 flex flex-col gap-2 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-56"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
               <div className="flex flex-col gap-1">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">แก้ไขข้อความ</span>
                 <input

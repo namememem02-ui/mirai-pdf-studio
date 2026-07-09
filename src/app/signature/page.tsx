@@ -122,7 +122,10 @@ function EditablePage({
             />
 
             {/* Signature Control Panel */}
-            <div className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-lg p-2 flex items-center gap-2.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-48">
+            <div
+              className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-lg p-2 flex items-center gap-2.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-48"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
               <div className="flex-1 flex flex-col gap-0.5">
                 <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">ขนาดกว้าง</span>
                 <input
