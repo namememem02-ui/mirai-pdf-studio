@@ -20,6 +20,8 @@ interface TextInstance {
   color: string; // Hex color code
   renderedWidth: number;
   renderedHeight: number;
+  isBold?: boolean;
+  isItalic?: boolean;
 }
 
 interface EditablePageProps {
@@ -32,6 +34,8 @@ interface EditablePageProps {
   onAddText: (pageIndex: number, x: number, y: number, renderedWidth: number, renderedHeight: number) => void;
   onUpdateText: (id: string, text: string) => void;
   onUpdateFontSize: (id: string, size: number) => void;
+  onToggleBold: (id: string) => void;
+  onToggleItalic: (id: string) => void;
   onDeleteText: (id: string) => void;
   onStartDrag: (e: React.MouseEvent, id: string) => void;
 }
@@ -46,6 +50,8 @@ function EditablePage({
   onAddText,
   onUpdateText,
   onUpdateFontSize,
+  onToggleBold,
+  onToggleItalic,
   onDeleteText,
   onStartDrag,
 }: EditablePageProps) {
@@ -124,7 +130,8 @@ function EditablePage({
               style={{
                 fontSize: `${inst.fontSize}px`,
                 color: inst.color,
-                fontWeight: 'bold',
+                fontWeight: inst.isBold ? 'bold' : 'normal',
+                fontStyle: inst.isItalic ? 'italic' : 'normal',
                 fontFamily: 'Sarabun, sans-serif',
               }}
             >
@@ -146,6 +153,30 @@ function EditablePage({
                 />
               </div>
 
+              {/* Style controls (Bold / Italic) */}
+              <div className="flex gap-2.5 border-b border-gray-100 pb-2">
+                <button
+                  onClick={() => onToggleBold(inst.id)}
+                  className={`px-3 py-1 rounded border text-[10px] font-bold transition cursor-pointer flex-1 text-center ${
+                    inst.isBold
+                      ? 'border-pink-500 bg-pink-50 text-pink-600'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                  }`}
+                >
+                  หนา (B)
+                </button>
+                <button
+                  onClick={() => onToggleItalic(inst.id)}
+                  className={`px-3 py-1 rounded border text-[10px] italic transition cursor-pointer flex-1 text-center ${
+                    inst.isItalic
+                      ? 'border-pink-500 bg-pink-50 text-pink-600 font-semibold'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                  }`}
+                >
+                  เอียง (I)
+                </button>
+              </div>
+
               <div className="flex items-center justify-between gap-3">
                 <div className="flex-1 flex flex-col gap-0.5">
                   <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">ขนาดอักษร: {inst.fontSize}px</span>
@@ -155,7 +186,7 @@ function EditablePage({
                     max="64"
                     value={inst.fontSize}
                     onChange={(e) => onUpdateFontSize(inst.id, parseInt(e.target.value) || 12)}
-                    className="w-full h-1 bg-gray-250 rounded-lg cursor-pointer accent-pink-500"
+                    className="w-full h-1 bg-gray-255 rounded-lg cursor-pointer accent-pink-500"
                   />
                 </div>
                 <button
@@ -186,7 +217,14 @@ export default function AddTextPage() {
   const [activeText, setActiveText] = useState('ข้อความใหม่');
   const [activeFontSize, setActiveFontSize] = useState(16);
   const [activeColor, setActiveColor] = useState('#ff0055');
-  const [thaiFontBytes, setThaiFontBytes] = useState<ArrayBuffer | null>(null);
+  const [activeIsBold, setActiveIsBold] = useState(false);
+  const [activeIsItalic, setActiveIsItalic] = useState(false);
+
+  // 4 Font files for Regular, Bold, Italic, Bold-Italic styles
+  const [thaiFontRegular, setThaiFontRegular] = useState<ArrayBuffer | null>(null);
+  const [thaiFontBold, setThaiFontBold] = useState<ArrayBuffer | null>(null);
+  const [thaiFontItalic, setThaiFontItalic] = useState<ArrayBuffer | null>(null);
+  const [thaiFontBoldItalic, setThaiFontBoldItalic] = useState<ArrayBuffer | null>(null);
 
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
@@ -195,17 +233,23 @@ export default function AddTextPage() {
   const [resultItemId, setResultItemId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
-  // Fetch Thai Sarabun font at runtime for pdf-lib TrueType rendering
+  // Fetch Thai Sarabun fonts at runtime for pdf-lib TrueType rendering
   useEffect(() => {
-    fetch('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Regular.ttf')
-      .then((res) => {
-        if (!res.ok) throw new Error('Network error');
-        return res.arrayBuffer();
-      })
-      .then((bytes) => setThaiFontBytes(bytes))
-      .catch((err) => {
-        console.warn('Failed to load online Sarabun font, Thai text will fall back to Helvetica.', err);
-      });
+    const loadFont = async (url: string, setter: (b: ArrayBuffer) => void) => {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) throw new Error('HTTP error');
+        const bytes = await res.arrayBuffer();
+        setter(bytes);
+      } catch (err) {
+        console.warn('Failed to load font:', url, err);
+      }
+    };
+
+    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Regular.ttf', setThaiFontRegular);
+    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Bold.ttf', setThaiFontBold);
+    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Italic.ttf', setThaiFontItalic);
+    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-BoldItalic.ttf', setThaiFontBoldItalic);
   }, []);
 
   const pick = async (files: File[]) => {
@@ -249,6 +293,8 @@ export default function AddTextPage() {
       color: activeColor,
       renderedWidth: rWidth,
       renderedHeight: rHeight,
+      isBold: activeIsBold,
+      isItalic: activeIsItalic,
     };
 
     setTextInstances((prev) => [...prev, newInst]);
@@ -265,6 +311,20 @@ export default function AddTextPage() {
   const handleUpdateFontSize = (id: string, fontSize: number) => {
     setTextInstances((prev) =>
       prev.map((inst) => (inst.id === id ? { ...inst, fontSize } : inst))
+    );
+    setDone(false);
+  };
+
+  const handleToggleBold = (id: string) => {
+    setTextInstances((prev) =>
+      prev.map((inst) => (inst.id === id ? { ...inst, isBold: !inst.isBold } : inst))
+    );
+    setDone(false);
+  };
+
+  const handleToggleItalic = (id: string) => {
+    setTextInstances((prev) =>
+      prev.map((inst) => (inst.id === id ? { ...inst, isItalic: !inst.isItalic } : inst))
     );
     setDone(false);
   };
@@ -323,16 +383,45 @@ export default function AddTextPage() {
       const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
       doc.registerFontkit(fontkit);
 
-      // Embed Thai font or Helvetica fallback
-      const customFont = thaiFontBytes
-        ? await doc.embedFont(thaiFontBytes, { subset: true })
-        : await doc.embedFont(StandardFonts.Helvetica);
+      // Cache for embedded font style combinations
+      const embeddedFonts: Record<string, any> = {};
 
       for (const inst of textInstances) {
         if (!inst.text.trim()) continue;
 
         const page = doc.getPage(inst.pageIndex);
         const { width, height } = page.getSize();
+
+        // Get or embed the matching styled font
+        const isBold = !!inst.isBold;
+        const isItalic = !!inst.isItalic;
+        const fontKey = `${isBold}-${isItalic}`;
+        
+        let customFont = embeddedFonts[fontKey];
+        if (!customFont) {
+          let fontBytes: ArrayBuffer | null = null;
+          let standardFontName = StandardFonts.Helvetica;
+
+          if (isBold && isItalic) {
+            fontBytes = thaiFontBoldItalic;
+            standardFontName = StandardFonts.HelveticaBoldOblique;
+          } else if (isBold) {
+            fontBytes = thaiFontBold;
+            standardFontName = StandardFonts.HelveticaBold;
+          } else if (isItalic) {
+            fontBytes = thaiFontItalic;
+            standardFontName = StandardFonts.HelveticaOblique;
+          } else {
+            fontBytes = thaiFontRegular;
+            standardFontName = StandardFonts.Helvetica;
+          }
+
+          customFont = fontBytes
+            ? await doc.embedFont(fontBytes, { subset: true })
+            : await doc.embedFont(standardFontName);
+
+          embeddedFonts[fontKey] = customFont;
+        }
 
         // Hex to rgb conversion
         const cleanHex = inst.color.replace('#', '');
@@ -440,9 +529,35 @@ export default function AddTextPage() {
                 </div>
               </div>
 
-              {!thaiFontBytes && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1">ลักษณะอักษรเริ่มต้น</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setActiveIsBold(!activeIsBold)}
+                    className={`py-1.5 border rounded-lg text-xs font-bold transition cursor-pointer flex-1 text-center ${
+                      activeIsBold
+                        ? 'border-pink-500 bg-pink-50 text-pink-600'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                    }`}
+                  >
+                    ตัวหนา (Bold)
+                  </button>
+                  <button
+                    onClick={() => setActiveIsItalic(!activeIsItalic)}
+                    className={`py-1.5 border rounded-lg text-xs italic transition cursor-pointer flex-1 text-center ${
+                      activeIsItalic
+                        ? 'border-pink-500 bg-pink-50 text-pink-600 font-semibold'
+                        : 'border-gray-200 hover:border-gray-300 text-gray-600 bg-white'
+                    }`}
+                  >
+                    ตัวเอียง (Italic)
+                  </button>
+                </div>
+              </div>
+
+              {!(thaiFontRegular && thaiFontBold && thaiFontItalic && thaiFontBoldItalic) && (
                 <div className="text-[10px] text-amber-600 bg-amber-50 p-2.5 rounded-lg border border-amber-100 leading-normal">
-                  ⚠️ ยังโหลดฟอนต์ภาษาไทยออนไลน์ไม่เสร็จ ตัวอักษรไทยอาจไม่ถูกวาดบนไฟล์ PDF หรือใช้อักษรพื้นหลังแทน
+                  ⏳ กำลังโหลดฟอนต์ภาษาไทยออนไลน์ให้ครบทุกรูปแบบ (ปกติ, หนา, เอียง)...
                 </div>
               )}
             </div>
@@ -470,6 +585,8 @@ export default function AddTextPage() {
                     onAddText={handleAddText}
                     onUpdateText={handleUpdateText}
                     onUpdateFontSize={handleUpdateFontSize}
+                    onToggleBold={handleToggleBold}
+                    onToggleItalic={handleToggleItalic}
                     onDeleteText={handleDeleteText}
                     onStartDrag={handleStartDrag}
                   />
