@@ -65,6 +65,13 @@ export const TOOLS: ToolInfo[] = [
     color: 'bg-teal-100',
   },
   {
+    id: 'signature',
+    name: 'เซ็นชื่อ PDF',
+    description: 'วาดลายเซ็นหรืออัปโหลดรูปภาพลายเซ็น ปั๊มวางและย้ายตำแหน่งบนหน้ากระดาษได้อิสระ',
+    icon: '🖋️',
+    color: 'bg-purple-100',
+  },
+  {
     id: 'extract-text',
     name: 'ดึงข้อความจาก PDF',
     description: 'คัดลอกข้อความทั้งหมดในเอกสาร หรือบันทึกเป็นไฟล์ .txt',
