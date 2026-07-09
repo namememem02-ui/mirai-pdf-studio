@@ -51,6 +51,7 @@ interface EditablePageProps {
   ) => void;
   onAddLine: (line: EraserLine) => void;
   onSelectEraser: (id: string) => void;
+  onDeleteLine: (id: string) => void;
   onStartDrag: (e: React.MouseEvent, id: string) => void;
 }
 
@@ -66,6 +67,7 @@ function EditablePage({
   onAddEraser,
   onAddLine,
   onSelectEraser,
+  onDeleteLine,
   onStartDrag,
 }: EditablePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -210,7 +212,7 @@ function EditablePage({
         )}
 
         {/* Freehand SVG Overlay for compiled Lines */}
-        <svg className="absolute inset-0 pointer-events-none z-10 w-full h-full">
+        <svg className="absolute inset-0 z-10 w-full h-full" style={{ pointerEvents: 'none' }}>
           {eraserLines.map((line) => (
             <polyline
               key={line.id}
@@ -220,6 +222,14 @@ function EditablePage({
               strokeWidth={line.thickness}
               strokeLinecap="round"
               strokeLinejoin="round"
+              className="hover:opacity-80 transition-opacity"
+              style={{ pointerEvents: 'visibleStroke', cursor: 'pointer' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm('ต้องการลบเส้นวาดดินสอนี้ใช่หรือไม่?')) {
+                  onDeleteLine(line.id);
+                }
+              }}
             />
           ))}
           {/* Active drawing line preview */}
@@ -799,6 +809,67 @@ export default function EraseTextPage() {
                   </button>
                 </div>
               )}
+
+              {/* List of all annotations */}
+              {(eraserInstances.length > 0 || eraserLines.length > 0) && (
+                <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-3 shadow-sm">
+                  <span className="text-xs font-bold text-gray-500 uppercase tracking-wide block border-b border-gray-100 pb-2">
+                    📋 รายการสี่เหลี่ยม / ลายเส้นวาด ({eraserInstances.length + eraserLines.length})
+                  </span>
+                  <div className="max-h-44 overflow-y-auto space-y-1.5 pr-1 text-xs">
+                    {eraserInstances.map((inst, idx) => (
+                      <div
+                        key={inst.id}
+                        onClick={() => {
+                          setEraserMode('box');
+                          setSelectedEraserId(inst.id);
+                        }}
+                        className={`flex items-center justify-between p-2 rounded cursor-pointer border transition ${
+                          selectedEraserId === inst.id
+                            ? 'bg-pink-50 border-pink-200 text-pink-700 font-semibold'
+                            : 'bg-gray-50 border-gray-100 hover:bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        <span>
+                          📐 กล่องลบที่ {idx + 1} (หน้า {inst.pageIndex + 1})
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteEraser(inst.id);
+                          }}
+                          className="text-red-500 hover:text-red-700 font-bold px-1.5"
+                          title="ลบกล่องนี้"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                    {eraserLines.map((line, idx) => (
+                      <div
+                        key={line.id}
+                        className="flex items-center justify-between p-2 bg-gray-50 border border-gray-100 rounded text-gray-600 hover:bg-gray-100 transition-colors"
+                      >
+                        <span>
+                          ✏️ เส้นดินสอที่ {idx + 1} (หน้า {line.pageIndex + 1})
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setEraserLines((prev) => prev.filter((l) => l.id !== line.id));
+                            setActionHistory((prev) => prev.filter((act) => act.id !== line.id));
+                            setDone(false);
+                          }}
+                          className="text-red-500 hover:text-red-700 font-bold px-1.5"
+                          title="ลบเส้นวาดนี้"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Stamping Grid pages preview */}
@@ -826,6 +897,11 @@ export default function EraseTextPage() {
                     onAddEraser={handleAddEraser}
                     onAddLine={handleAddLine}
                     onSelectEraser={setSelectedEraserId}
+                    onDeleteLine={(id) => {
+                      setEraserLines((prev) => prev.filter((l) => l.id !== id));
+                      setActionHistory((prev) => prev.filter((act) => act.id !== id));
+                      setDone(false);
+                    }}
                     onStartDrag={handleStartDrag}
                   />
                 ))}
