@@ -51,6 +51,20 @@ export const TOOLS: ToolInfo[] = [
     color: 'bg-sky-100',
   },
   {
+    id: 'watermark',
+    name: 'ใส่ลายน้ำ PDF',
+    description: 'ปั๊มลายน้ำข้อความทับลงบนเอกสาร ปรับความโปร่งแสง สี พิกัด และมุมหมุนได้',
+    icon: '✍️',
+    color: 'bg-cyan-100',
+  },
+  {
+    id: 'page-number',
+    name: 'ใส่เลขหน้า PDF',
+    description: 'พิมพ์หมายเลขหน้าลงบนขอบกระดาษอัตโนมัติ ปรับรูปแบบและเว้นหน้าปกได้',
+    icon: '🔢',
+    color: 'bg-teal-100',
+  },
+  {
     id: 'extract-text',
     name: 'ดึงข้อความจาก PDF',
     description: 'คัดลอกข้อความทั้งหมดในเอกสาร หรือบันทึกเป็นไฟล์ .txt',
