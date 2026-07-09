@@ -72,6 +72,13 @@ export const TOOLS: ToolInfo[] = [
     color: 'bg-purple-100',
   },
   {
+    id: 'add-text',
+    name: 'เพิ่มข้อความ PDF',
+    description: 'พิมพ์และเติมข้อความใหม่ลงบนหน้าเอกสาร ปรับเปลี่ยนขนาดตัวอักษร สี และพิกัดได้อิสระ',
+    icon: '✍️',
+    color: 'bg-pink-100',
+  },
+  {
     id: 'extract-text',
     name: 'ดึงข้อความจาก PDF',
     description: 'คัดลอกข้อความทั้งหมดในเอกสาร หรือบันทึกเป็นไฟล์ .txt',
