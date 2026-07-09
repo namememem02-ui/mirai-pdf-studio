@@ -1,0 +1,7 @@
+@import "tailwindcss";
+
+body {
+  background: #f7f8fa;
+  color: #1f2937;
+  font-family: "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
+}
