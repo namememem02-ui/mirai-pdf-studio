@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
@@ -317,7 +318,12 @@ export default function AddTextPage() {
 
     try {
       const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-      const customFont = await doc.embedFont(StandardFonts.Helvetica);
+      doc.registerFontkit(fontkit);
+
+      // Embed Thai font or Helvetica fallback
+      const customFont = thaiFontBytes
+        ? await doc.embedFont(thaiFontBytes, { subset: true })
+        : await doc.embedFont(StandardFonts.Helvetica);
 
       for (const inst of textInstances) {
         if (!inst.text.trim()) continue;
