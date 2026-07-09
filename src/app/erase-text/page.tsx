@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { PDFDocument, rgb } from 'pdf-lib';
+import { PDFDocument, rgb, LineCapStyle } from 'pdf-lib';
 import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
@@ -21,11 +21,25 @@ interface EraserInstance {
   renderedHeight: number;
 }
 
+interface EraserLine {
+  id: string;
+  pageIndex: number;
+  points: { x: number; y: number }[]; // HTML viewport points list
+  thickness: number;
+  color: string;
+  renderedWidth: number;
+  renderedHeight: number;
+}
+
 interface EditablePageProps {
   pageNumber: number;
   pdfDoc: any;
   eraserInstances: EraserInstance[];
+  eraserLines: EraserLine[];
   activeColor: string;
+  eraserMode: 'box' | 'pencil';
+  brushThickness: number;
+  selectedEraserId: string | null;
   onAddEraser: (
     pageIndex: number,
     x: number,
@@ -35,10 +49,8 @@ interface EditablePageProps {
     renderedWidth: number,
     renderedHeight: number
   ) => void;
-  onUpdateWidth: (id: string, width: number) => void;
-  onUpdateHeight: (id: string, height: number) => void;
-  onUpdateColor: (id: string, color: string) => void;
-  onDeleteEraser: (id: string) => void;
+  onAddLine: (line: EraserLine) => void;
+  onSelectEraser: (id: string) => void;
   onStartDrag: (e: React.MouseEvent, id: string) => void;
 }
 
@@ -46,22 +58,26 @@ function EditablePage({
   pageNumber,
   pdfDoc,
   eraserInstances,
+  eraserLines,
   activeColor,
+  eraserMode,
+  brushThickness,
+  selectedEraserId,
   onAddEraser,
-  onUpdateWidth,
-  onUpdateHeight,
-  onUpdateColor,
-  onDeleteEraser,
+  onAddLine,
+  onSelectEraser,
   onStartDrag,
 }: EditablePageProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [loading, setLoading] = useState(true);
 
-  // States for click & drag rectangle drawing
+  // States for drawing interactions
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
   const [drawRect, setDrawRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [pencilPoints, setPencilPoints] = useState<{ x: number; y: number }[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -92,14 +108,18 @@ function EditablePage({
   }, [pdfDoc, pageNumber]);
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Prevent starting a draw if clicking on existing stamps / control popovers
     const rect = e.currentTarget.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
 
     setIsDrawing(true);
     setStartPos({ x: startX, y: startY });
-    setDrawRect({ x: startX, y: startY, width: 0, height: 0 });
+
+    if (eraserMode === 'box') {
+      setDrawRect({ x: startX, y: startY, width: 0, height: 0 });
+    } else {
+      setPencilPoints([{ x: startX, y: startY }]);
+    }
 
     const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
       const currentX = moveEvent.clientX - rect.left;
@@ -109,12 +129,15 @@ function EditablePage({
       const boundedX = Math.max(0, Math.min(rect.width, currentX));
       const boundedY = Math.max(0, Math.min(rect.height, currentY));
 
-      const x = Math.min(startX, boundedX);
-      const y = Math.min(startY, boundedY);
-      const w = Math.abs(boundedX - startX);
-      const h = Math.abs(boundedY - startY);
-
-      setDrawRect({ x, y, width: w, height: h });
+      if (eraserMode === 'box') {
+        const x = Math.min(startX, boundedX);
+        const y = Math.min(startY, boundedY);
+        const w = Math.abs(boundedX - startX);
+        const h = Math.abs(boundedY - startY);
+        setDrawRect({ x, y, width: w, height: h });
+      } else {
+        setPencilPoints((prev) => [...prev, { x: boundedX, y: boundedY }]);
+      }
     };
 
     const handleGlobalMouseUp = (upEvent: MouseEvent) => {
@@ -123,29 +146,43 @@ function EditablePage({
 
       setIsDrawing(false);
       setStartPos(null);
-      setDrawRect(null);
 
-      const finalRect = rect;
-      const endX = upEvent.clientX - finalRect.left;
-      const endY = upEvent.clientY - finalRect.top;
+      if (eraserMode === 'box') {
+        setDrawRect(null);
 
-      const boundedEndX = Math.max(0, Math.min(finalRect.width, endX));
-      const boundedEndY = Math.max(0, Math.min(finalRect.height, endY));
+        const endX = upEvent.clientX - rect.left;
+        const endY = upEvent.clientY - rect.top;
+        const boundedEndX = Math.max(0, Math.min(rect.width, endX));
+        const boundedEndY = Math.max(0, Math.min(rect.height, endY));
 
-      const w = Math.abs(boundedEndX - startX);
-      const h = Math.abs(boundedEndY - startY);
+        const w = Math.abs(boundedEndX - startX);
+        const h = Math.abs(boundedEndY - startY);
+        const x = Math.min(startX, boundedEndX);
+        const y = Math.min(startY, boundedEndY);
 
-      const x = Math.min(startX, boundedEndX);
-      const y = Math.min(startY, boundedEndY);
-
-      if (w < 6 && h < 6) {
-        // It's a simple click! Place a default eraser (100x25) centered at click
-        onAddEraser(pageNumber - 1, startX, startY, 100, 25, finalRect.width, finalRect.height);
+        if (w < 6 && h < 6) {
+          // Default stamp
+          onAddEraser(pageNumber - 1, startX, startY, 100, 25, rect.width, rect.height);
+        } else {
+          // Custom drag-draw
+          const centerX = x + w / 2;
+          const centerY = y + h / 2;
+          onAddEraser(pageNumber - 1, centerX, centerY, w, h, rect.width, rect.height);
+        }
       } else {
-        // Place drag-drawn box
-        const centerX = x + w / 2;
-        const centerY = y + h / 2;
-        onAddEraser(pageNumber - 1, centerX, centerY, w, h, finalRect.width, finalRect.height);
+        // Complete freehand pencil stroke
+        if (pencilPoints.length > 1) {
+          onAddLine({
+            id: `line-${Date.now()}-${Math.random()}`,
+            pageIndex: pageNumber - 1,
+            points: pencilPoints,
+            thickness: brushThickness,
+            color: activeColor,
+            renderedWidth: rect.width,
+            renderedHeight: rect.height,
+          });
+        }
+        setPencilPoints([]);
       }
     };
 
@@ -154,14 +191,17 @@ function EditablePage({
   };
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center select-none">
       <span className="text-xs text-gray-400 mb-2 font-semibold">หน้าที่ {pageNumber}</span>
       <div
-        className="relative border border-gray-300 bg-white shadow-md select-none mb-8 cursor-crosshair"
+        ref={containerRef}
+        className={`relative border border-gray-300 bg-white shadow-md mb-8 ${
+          eraserMode === 'pencil' ? 'cursor-pencil' : 'cursor-crosshair'
+        }`}
         style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
         onMouseDown={handleMouseDown}
       >
-        <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
+        <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-0" />
 
         {loading && (
           <div className="absolute inset-0 bg-gray-50/50 flex items-center justify-center text-xs text-gray-500">
@@ -169,10 +209,37 @@ function EditablePage({
           </div>
         )}
 
-        {/* Real-time Drawing Box Preview Overlay */}
-        {isDrawing && drawRect && (
+        {/* Freehand SVG Overlay for compiled Lines */}
+        <svg className="absolute inset-0 pointer-events-none z-10 w-full h-full">
+          {eraserLines.map((line) => (
+            <polyline
+              key={line.id}
+              points={line.points.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke={line.color}
+              strokeWidth={line.thickness}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ))}
+          {/* Active drawing line preview */}
+          {eraserMode === 'pencil' && isDrawing && pencilPoints.length > 0 && (
+            <polyline
+              points={pencilPoints.map((p) => `${p.x},${p.y}`).join(' ')}
+              fill="none"
+              stroke={activeColor}
+              strokeWidth={brushThickness}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              opacity={0.8}
+            />
+          )}
+        </svg>
+
+        {/* Real-time Box Drawing Preview Overlay */}
+        {eraserMode === 'box' && isDrawing && drawRect && (
           <div
-            className="absolute border border-dashed border-yellow-500 z-50 pointer-events-none"
+            className="absolute border border-dashed border-yellow-500 z-20 pointer-events-none"
             style={{
               left: `${drawRect.x}px`,
               top: `${drawRect.y}px`,
@@ -184,86 +251,37 @@ function EditablePage({
           />
         )}
 
-        {eraserInstances.map((inst) => (
-          <div
-            key={inst.id}
-            className="absolute border border-dashed border-gray-400 cursor-move group z-20"
-            style={{
-              left: `${inst.x}px`,
-              top: `${inst.y}px`,
-              width: `${inst.width}px`,
-              height: `${inst.height}px`,
-              transform: 'translate(-50%, -50%)',
-              backgroundColor: inst.color,
-              boxShadow: '0 0 2px rgba(0, 0, 0, 0.1)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => onStartDrag(e, inst.id)}
-          >
-            {/* Visual Indicator of Eraser Color to distinguish from background */}
-            <div className="absolute inset-0 border border-white/30 pointer-events-none flex items-center justify-center">
-              <span className="text-[8px] font-bold text-gray-400 opacity-0 group-hover:opacity-100 select-none bg-white/80 px-1 py-0.5 rounded shadow">
-                ยางลบ
-              </span>
-            </div>
-
-            {/* Eraser Controls Overlay */}
+        {/* Rendered Eraser Boxes */}
+        {eraserInstances.map((inst) => {
+          const isSelected = selectedEraserId === inst.id;
+          return (
             <div
-              className="absolute left-1/2 bottom-full mb-2.5 -translate-x-1/2 bg-white border border-gray-200 shadow-2xl rounded-xl p-3 flex flex-col gap-2.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-56"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block border-b border-gray-100 pb-1">
-                🧼 ปรับปรุงกล่องลบคำ
-              </span>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] text-gray-500 font-medium">
-                  <span>ความกว้าง: {inst.width}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="5"
-                  max="350"
-                  value={inst.width}
-                  onChange={(e) => onUpdateWidth(inst.id, parseInt(e.target.value) || 10)}
-                  className="w-full h-1 bg-gray-200 rounded-lg cursor-pointer accent-yellow-500"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-[10px] text-gray-500 font-medium">
-                  <span>ความสูง: {inst.height}px</span>
-                </div>
-                <input
-                  type="range"
-                  min="5"
-                  max="150"
-                  value={inst.height}
-                  onChange={(e) => onUpdateHeight(inst.id, parseInt(e.target.value) || 10)}
-                  className="w-full h-1 bg-gray-250 rounded-lg cursor-pointer accent-yellow-500"
-                />
-              </div>
-
-              <div className="flex items-center justify-between gap-2 border-t border-gray-50 pt-2">
-                <div className="flex items-center gap-1.5">
-                  <input
-                    type="color"
-                    value={inst.color}
-                    onChange={(e) => onUpdateColor(inst.id, e.target.value)}
-                    className="w-6 h-6 p-0 border border-gray-300 rounded cursor-pointer"
-                  />
-                  <span className="text-[10px] text-gray-400 uppercase font-mono">{inst.color}</span>
-                </div>
-                <button
-                  onClick={() => onDeleteEraser(inst.id)}
-                  className="text-xs text-red-500 hover:text-red-700 font-bold px-2 py-1 hover:bg-red-50 rounded"
-                >
-                  ✕ ลบกรอบ
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+              key={inst.id}
+              className={`absolute border transition-shadow z-20 cursor-move ${
+                isSelected
+                  ? 'border-pink-500 ring-2 ring-pink-500/30 shadow-lg scale-[1.01]'
+                  : 'border-dashed border-gray-400 hover:border-gray-600'
+              }`}
+              style={{
+                left: `${inst.x}px`,
+                top: `${inst.y}px`,
+                width: `${inst.width}px`,
+                height: `${inst.height}px`,
+                transform: 'translate(-50%, -50%)',
+                backgroundColor: inst.color,
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                onSelectEraser(inst.id);
+              }}
+              onMouseDown={(e) => {
+                e.stopPropagation();
+                onStartDrag(e, inst.id);
+                onSelectEraser(inst.id);
+              }}
+            />
+          );
+        })}
       </div>
     </div>
   );
@@ -276,9 +294,20 @@ export default function EraseTextPage() {
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pageCount, setPageCount] = useState(0);
   const [eraserInstances, setEraserInstances] = useState<EraserInstance[]>([]);
+  const [eraserLines, setEraserLines] = useState<EraserLine[]>([]);
+
+  // Action history for Undo
+  const [actionHistory, setActionHistory] = useState<{ type: 'box' | 'line'; id: string }[]>([]);
+
+  // Tool Modes
+  const [eraserMode, setEraserMode] = useState<'box' | 'pencil'>('box');
+  const [brushThickness, setBrushThickness] = useState(12);
+
+  // Selected Box ID for properties sidebar panel
+  const [selectedEraserId, setSelectedEraserId] = useState<string | null>(null);
 
   // Eraser Color settings
-  const [activeColor, setActiveColor] = useState('#ffffff'); // Default: White (to match white backgrounds)
+  const [activeColor, setActiveColor] = useState('#ffffff');
   const [eyeDropperSupported, setEyeDropperSupported] = useState(false);
 
   const [busy, setBusy] = useState(false);
@@ -288,7 +317,6 @@ export default function EraseTextPage() {
   const [resultItemId, setResultItemId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
-  // Check browser EyeDropper API support
   useEffect(() => {
     if (typeof window !== 'undefined' && 'EyeDropper' in window) {
       setEyeDropperSupported(true);
@@ -305,6 +333,9 @@ export default function EraseTextPage() {
     setDone(false);
     setFile(f);
     setEraserInstances([]);
+    setEraserLines([]);
+    setActionHistory([]);
+    setSelectedEraserId(null);
     setBusy(true);
     setProgress('กำลังโหลดไฟล์ PDF...');
 
@@ -345,6 +376,14 @@ export default function EraseTextPage() {
     };
 
     setEraserInstances((prev) => [...prev, newInst]);
+    setActionHistory((prev) => [...prev, { type: 'box', id: newInst.id }]);
+    setSelectedEraserId(newInst.id); // Auto-select the box to adjust in sidebar
+    setDone(false);
+  };
+
+  const handleAddLine = (line: EraserLine) => {
+    setEraserLines((prev) => [...prev, line]);
+    setActionHistory((prev) => [...prev, { type: 'line', id: line.id }]);
     setDone(false);
   };
 
@@ -371,6 +410,24 @@ export default function EraseTextPage() {
 
   const handleDeleteEraser = (id: string) => {
     setEraserInstances((prev) => prev.filter((inst) => inst.id !== id));
+    setActionHistory((prev) => prev.filter((act) => act.id !== id));
+    if (selectedEraserId === id) setSelectedEraserId(null);
+    setDone(false);
+  };
+
+  // Undo the last action (either eraser line or box)
+  const handleUndo = () => {
+    if (actionHistory.length === 0) return;
+    const lastAction = actionHistory[actionHistory.length - 1];
+
+    if (lastAction.type === 'box') {
+      setEraserInstances((prev) => prev.filter((inst) => inst.id !== lastAction.id));
+      if (selectedEraserId === lastAction.id) setSelectedEraserId(null);
+    } else {
+      setEraserLines((prev) => prev.filter((line) => line.id !== lastAction.id));
+    }
+
+    setActionHistory((prev) => prev.slice(0, -1));
     setDone(false);
   };
 
@@ -406,13 +463,18 @@ export default function EraseTextPage() {
     document.addEventListener('mouseup', handleMouseUp);
   };
 
-  // Launch EyeDropper to pick background color
   const launchEyeDropper = async () => {
     if (!eyeDropperSupported) return;
     try {
       const eyeDropper = new (window as any).EyeDropper();
       const result = await eyeDropper.open();
-      setActiveColor(result.sRGBHex);
+      
+      // If a box is selected, apply directly to it. Otherwise, set as default color.
+      if (selectedEraserId) {
+        handleUpdateColor(selectedEraserId, result.sRGBHex);
+      } else {
+        setActiveColor(result.sRGBHex);
+      }
       setError(null);
     } catch (err) {
       console.warn('EyeDropper closed or failed:', err);
@@ -421,13 +483,13 @@ export default function EraseTextPage() {
 
   const savePdf = async () => {
     if (!file) return;
-    if (eraserInstances.length === 0) {
-      setError('กรุณาคลิกเพื่อสร้างกรอบยางลบถมปิดทับข้อความเดิมอย่างน้อย 1 จุด');
+    if (eraserInstances.length === 0 && eraserLines.length === 0) {
+      setError('กรุณาตีกรอบหรือขีดเขียนยางลบปิดทับข้อความอย่างน้อย 1 จุด');
       return;
     }
 
     setBusy(true);
-    setProgress('กำลังประมวลผลวาดกรอบถมสีปิดทับข้อความเดิม (ยางลบ)...');
+    setProgress('กำลังถมทับสีและประมวลผลลบรอยข้อความใน PDF...');
     setError(null);
     setDone(false);
     setResultItemId(null);
@@ -435,17 +497,16 @@ export default function EraseTextPage() {
     try {
       const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
 
+      // Compile Box Erasers
       for (const inst of eraserInstances) {
         const page = doc.getPage(inst.pageIndex);
         const { width, height } = page.getSize();
 
-        // Convert Hex to rgb
         const cleanHex = inst.color.replace('#', '');
         const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
         const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
         const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
 
-        // Bounding box mapping (HTML center coordinates translation)
         const sigLeft = inst.x - inst.width / 2;
         const sigTop = inst.y - inst.height / 2;
 
@@ -454,7 +515,6 @@ export default function EraseTextPage() {
         const pdfWidth = (inst.width / inst.renderedWidth) * width;
         const pdfHeight = (inst.height / inst.renderedHeight) * height;
 
-        // Draw filled rectangle over the page content
         page.drawRectangle({
           x: pdfX,
           y: pdfY,
@@ -464,6 +524,39 @@ export default function EraseTextPage() {
           borderColor: rgb(r, g, b),
           borderWidth: 0,
         });
+      }
+
+      // Compile Pencil Erasers (Freehand Lines)
+      for (const line of eraserLines) {
+        if (line.points.length < 2) continue;
+        const page = doc.getPage(line.pageIndex);
+        const { width, height } = page.getSize();
+
+        const cleanHex = line.color.replace('#', '');
+        const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
+        const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
+        const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
+
+        // Map scale thickness
+        const pdfThickness = (line.thickness / line.renderedHeight) * height;
+
+        for (let i = 0; i < line.points.length - 1; i++) {
+          const p1 = line.points[i];
+          const p2 = line.points[i + 1];
+
+          const pdfX1 = (p1.x / line.renderedWidth) * width;
+          const pdfY1 = ((line.renderedHeight - p1.y) / line.renderedHeight) * height;
+          const pdfX2 = (p2.x / line.renderedWidth) * width;
+          const pdfY2 = ((line.renderedHeight - p2.y) / line.renderedHeight) * height;
+
+          page.drawLine({
+            start: { x: pdfX1, y: pdfY1 },
+            end: { x: pdfX2, y: pdfY2 },
+            thickness: pdfThickness,
+            color: rgb(r, g, b),
+            lineCap: LineCapStyle.Round,
+          });
+        }
       }
 
       const outName = `${baseName(file.name)}_redacted.pdf`;
@@ -480,12 +573,14 @@ export default function EraseTextPage() {
     }
   };
 
+  const selectedEraser = eraserInstances.find((e) => e.id === selectedEraserId);
+
   return (
     <main className="max-w-5xl mx-auto px-4 py-8">
       <PageHeader
         icon="🧼"
         title="ลบข้อความ PDF (ลบคำเดิม)"
-        description="ลบคำ พิมพ์ทับ หรือเซ็นเซอร์รอยข้อความเดิมบน PDF โดยการวาดกล่องถมสีทับ (สีเริ่มต้นคือสีขาว) เลือกสีกลมกลืนกับกระดาษเดิมได้ด้วยเครื่องมือดูดสี"
+        description="ลบข้อความหรือปกปิดข้อมูลโดยไม่ทับตาตัวหนังสือ ด้วยเครื่องมือตีกรอบถมสี หรือเครื่องมือขีดเขียนลบดินสออิสระ"
       />
 
       <div className="space-y-6">
@@ -505,74 +600,215 @@ export default function EraseTextPage() {
 
         {file && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Eraser Color Control Sidebar */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 lg:col-span-4 space-y-5 shadow-sm">
-              <span className="text-sm font-bold text-gray-700 block border-b border-gray-100 pb-2">
-                ⚙️ ตั้งค่าสีกล่องลบ/ถม
-              </span>
+            {/* Sidebar Controls Panel */}
+            <div className="lg:col-span-4 space-y-4">
+              
+              {/* Eraser Tool Mode and Undo */}
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+                <span className="text-sm font-bold text-gray-700 block border-b border-gray-100 pb-2">
+                  🛠️ เครื่องมือยางลบ
+                </span>
 
-              {/* standard palettes */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-2">จานสียางลบด่วน</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {([
-                    { name: 'สีขาว', value: '#ffffff', border: 'border-gray-300' },
-                    { name: 'สีดำ', value: '#000000', border: 'border-black' },
-                    { name: 'สีเทาอ่อน', value: '#f3f4f6', border: 'border-gray-200' },
-                    { name: 'สีครีม', value: '#faf8f5', border: 'border-gray-200' },
-                  ]).map((colorItem) => (
-                    <button
-                      key={colorItem.value}
-                      onClick={() => setActiveColor(colorItem.value)}
-                      className={`h-9 rounded-lg border flex flex-col items-center justify-center transition cursor-pointer relative ${
-                        colorItem.border
-                      } ${activeColor === colorItem.value ? 'ring-2 ring-yellow-400 font-bold scale-95' : 'hover:scale-105'}`}
-                      style={{ backgroundColor: colorItem.value }}
-                      title={colorItem.name}
-                    >
-                      {activeColor === colorItem.value && (
-                        <span className="text-[10px] mix-blend-difference text-white font-bold">✓</span>
-                      )}
-                    </button>
-                  ))}
+                <div className="flex border border-gray-200 rounded-lg overflow-hidden text-xs font-bold divide-x divide-gray-200">
+                  <button
+                    onClick={() => {
+                      setEraserMode('box');
+                      setSelectedEraserId(null);
+                    }}
+                    className={`flex-1 py-2 text-center transition cursor-pointer border-none ${
+                      eraserMode === 'box' ? 'bg-yellow-50 text-yellow-800' : 'bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    📐 ตีกรอบลบ (Box)
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEraserMode('pencil');
+                      setSelectedEraserId(null);
+                    }}
+                    className={`flex-1 py-2 text-center transition cursor-pointer border-none ${
+                      eraserMode === 'pencil' ? 'bg-yellow-50 text-yellow-800' : 'bg-white text-gray-500 hover:bg-gray-50'
+                    }`}
+                  >
+                    ✏️ ดินสอลบ (Pencil)
+                  </button>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleUndo}
+                    disabled={actionHistory.length === 0}
+                    className="flex-1 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed transition cursor-pointer"
+                  >
+                    ↩️ เลิกทำ (Undo)
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('ล้างข้อมูลลบทังหมดของเอกสารนี้?')) {
+                        setEraserInstances([]);
+                        setEraserLines([]);
+                        setActionHistory([]);
+                        setSelectedEraserId(null);
+                      }
+                    }}
+                    className="py-2 px-3 border border-red-200 hover:bg-red-50 text-red-500 rounded-lg text-xs font-bold transition cursor-pointer"
+                    title="ล้างทั้งหมด"
+                  >
+                    🗑️
+                  </button>
                 </div>
               </div>
 
-              {/* Custom Picker and EyeDropper */}
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-semibold text-gray-600">สีที่กำหนดเอง</label>
-                  <div className="flex items-center gap-1.5">
+              {/* Color Settings (Pristine or Selected Box) */}
+              <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+                <span className="text-sm font-bold text-gray-700 block border-b border-gray-100 pb-2">
+                  ⚙️ ตั้งค่าสีและขนาด
+                </span>
+
+                {eraserMode === 'pencil' && (
+                  <div className="space-y-1.5 pb-2">
+                    <label className="block text-xs font-semibold text-gray-600">
+                      ขนาดดินสอลบ: {brushThickness}px
+                    </label>
                     <input
-                      type="color"
-                      value={activeColor}
-                      onChange={(e) => setActiveColor(e.target.value)}
-                      className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer border-none bg-transparent"
+                      type="range"
+                      min="4"
+                      max="40"
+                      value={brushThickness}
+                      onChange={(e) => setBrushThickness(parseInt(e.target.value) || 12)}
+                      className="w-full h-1 bg-gray-200 rounded-lg cursor-pointer accent-yellow-500"
                     />
-                    <span className="text-xs font-mono uppercase text-gray-500">{activeColor}</span>
+                  </div>
+                )}
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-2">
+                    {selectedEraser ? 'สีกรอบที่เลือก' : 'สียางลบเริ่มต้น'}
+                  </label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {([
+                      { name: 'สีขาว', value: '#ffffff', border: 'border-gray-300' },
+                      { name: 'สีดำ', value: '#000000', border: 'border-black' },
+                      { name: 'สีเทาอ่อน', value: '#f3f4f6', border: 'border-gray-200' },
+                      { name: 'สีครีม', value: '#faf8f5', border: 'border-gray-200' },
+                    ]).map((colorItem) => (
+                      <button
+                        key={colorItem.value}
+                        onClick={() => {
+                          if (selectedEraser) {
+                            handleUpdateColor(selectedEraser.id, colorItem.value);
+                          } else {
+                            setActiveColor(colorItem.value);
+                          }
+                        }}
+                        className={`h-9 rounded-lg border flex flex-col items-center justify-center transition cursor-pointer relative ${
+                          colorItem.border
+                        } ${(selectedEraser ? selectedEraser.color : activeColor) === colorItem.value ? 'ring-2 ring-yellow-400 font-bold scale-95' : 'hover:scale-105'}`}
+                        style={{ backgroundColor: colorItem.value }}
+                        title={colorItem.name}
+                      >
+                        {(selectedEraser ? selectedEraser.color : activeColor) === colorItem.value && (
+                          <span className="text-[10px] mix-blend-difference text-white font-bold">✓</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
-                {eyeDropperSupported && (
-                  <button
-                    onClick={launchEyeDropper}
-                    className="w-full py-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    🎨 ดูดสีตรงจากหน้าจอ (สีพื้นหลัง)
-                  </button>
-                )}
+                <div className="space-y-3 pt-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-gray-600">สีที่เลือกปรับเอง</label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="color"
+                        value={selectedEraser ? selectedEraser.color : activeColor}
+                        onChange={(e) => {
+                          if (selectedEraser) {
+                            handleUpdateColor(selectedEraser.id, e.target.value);
+                          } else {
+                            setActiveColor(e.target.value);
+                          }
+                        }}
+                        className="w-8 h-8 p-0 border border-gray-300 rounded cursor-pointer border-none bg-transparent"
+                      />
+                      <span className="text-xs font-mono uppercase text-gray-500">
+                        {selectedEraser ? selectedEraser.color : activeColor}
+                      </span>
+                    </div>
+                  </div>
+
+                  {eyeDropperSupported && (
+                    <button
+                      onClick={launchEyeDropper}
+                      className="w-full py-2 bg-yellow-50 hover:bg-yellow-100 border border-yellow-200 text-yellow-800 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      🎨 ดูดสีตรงจากหน้าจอ (สีพื้นหลัง)
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="text-[10px] text-gray-400 bg-gray-50 p-2.5 rounded-lg border border-gray-150 leading-relaxed">
-                💡 **วิธีการใช้งานให้แนบเนียน**: 
-                หากสีเอกสารไม่ใช่สีขาวล้วน (กระดาษแสกนเหลือง/เทา) ให้กดปุ่ม **ดูดสีตรงจากหน้าจอ** แล้วนำกล้องขยายไปแตะดูดสีเนื้อกระดาษใกล้ตัวอักษรเพื่อคัดลอกรหัสสีที่เนียนที่สุดมาถมทับ
-              </div>
+              {/* Selected Box Settings Panel (Instead of Popover!) */}
+              {selectedEraser && (
+                <div className="bg-white border border-pink-200 rounded-xl p-5 space-y-4 shadow-sm animate-fadeIn">
+                  <div className="flex items-center justify-between border-b border-pink-100 pb-2">
+                    <span className="text-xs font-bold text-pink-700 uppercase tracking-wide">
+                      🧼 ปรับขนาดกล่องถมที่เลือก
+                    </span>
+                    <button
+                      onClick={() => setSelectedEraserId(null)}
+                      className="text-[10px] text-gray-400 hover:text-gray-600 font-bold"
+                    >
+                      ยกเลิกเลือก
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 font-semibold">
+                      <span>ความกว้าง: {selectedEraser.width}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="400"
+                      value={selectedEraser.width}
+                      onChange={(e) => handleUpdateWidth(selectedEraser.id, parseInt(e.target.value) || 10)}
+                      className="w-full h-1 bg-gray-200 rounded-lg cursor-pointer accent-pink-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[10px] text-gray-500 font-semibold">
+                      <span>ความสูง: {selectedEraser.height}px</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="200"
+                      value={selectedEraser.height}
+                      onChange={(e) => handleUpdateHeight(selectedEraser.id, parseInt(e.target.value) || 10)}
+                      className="w-full h-1 bg-gray-200 rounded-lg cursor-pointer accent-pink-500"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => handleDeleteEraser(selectedEraser.id)}
+                    className="w-full py-2 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    🗑️ ลบกล่องยางลบนี้ออก
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Stamping Grid pages preview */}
             <div className="lg:col-span-8 flex flex-col items-center">
               <div className="w-full bg-yellow-50 text-yellow-800 rounded-lg p-3.5 border border-yellow-100 text-xs font-semibold text-center mb-5 shadow-sm leading-relaxed">
-                <p>👉 **คลิกค้างแล้วลากเมาส์** บนหน้ากระดาษเพื่อ **ตีกรอบสี่เหลี่ยมยางลบ** ขนาดตามต้องการทันที (หรือคลิกเฉย ๆ เพื่อวางกล่องขนาดมาตรฐาน 100x25 ก็ได้เช่นกัน)</p>
+                {eraserMode === 'box' ? (
+                  <p>👉 **คลิกค้างแล้วลากเมาส์** บนหน้ากระดาษเพื่อ **ตีกรอบยางลบถมสี** | ขอบเขตจะถูกถมทับเนียนตามสีที่เลือก (สียางลบสามารถมาคลิกเลือกขยับย่อขยายขนาดได้ที่แผงควบคุมด้านซ้าย)</p>
+                ) : (
+                  <p>✏️ **คลิกแล้ววาดขีดเขียน** ลายเส้นทับข้อความ/รูปภาพเพื่อลบออก (ขีดทับได้ทันทีตามขนาดขนาดดินสอและสีที่เลือก)</p>
+                )}
               </div>
 
               <div className="w-full max-h-[750px] overflow-y-auto pr-2 space-y-4">
@@ -582,12 +818,14 @@ export default function EraseTextPage() {
                     pageNumber={i + 1}
                     pdfDoc={pdfDoc}
                     eraserInstances={eraserInstances.filter((s) => s.pageIndex === i)}
+                    eraserLines={eraserLines.filter((s) => s.pageIndex === i)}
                     activeColor={activeColor}
+                    eraserMode={eraserMode}
+                    brushThickness={brushThickness}
+                    selectedEraserId={selectedEraserId}
                     onAddEraser={handleAddEraser}
-                    onUpdateWidth={handleUpdateWidth}
-                    onUpdateHeight={handleUpdateHeight}
-                    onUpdateColor={handleUpdateColor}
-                    onDeleteEraser={handleDeleteEraser}
+                    onAddLine={handleAddLine}
+                    onSelectEraser={setSelectedEraserId}
                     onStartDrag={handleStartDrag}
                   />
                 ))}
@@ -622,7 +860,7 @@ export default function EraseTextPage() {
           </div>
         )}
 
-        <ActionButton onClick={savePdf} disabled={!file || eraserInstances.length === 0 || busy} busy={busy}>
+        <ActionButton onClick={savePdf} disabled={!file || (eraserInstances.length === 0 && eraserLines.length === 0) || busy} busy={busy}>
           🧼 เริ่มถมลบข้อความ PDF
         </ActionButton>
       </div>
