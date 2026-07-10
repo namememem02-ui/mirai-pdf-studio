@@ -99,4 +99,11 @@ export const TOOLS: ToolInfo[] = [
     icon: '🔒',
     color: 'bg-slate-100',
   },
+  {
+    id: 'excel-to-pdf',
+    name: 'แปลง Excel เป็น PDF',
+    description: 'แปลงตารางข้อมูลจากไฟล์ Excel (.xlsx, .xls) ออกมาเป็นไฟล์เอกสาร PDF',
+    icon: '📊',
+    color: 'bg-emerald-50',
+  },
 ];
