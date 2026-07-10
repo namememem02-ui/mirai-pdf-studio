@@ -80,6 +80,7 @@ function EditablePage({
   const [startPos, setStartPos] = useState<{ x: number; y: number } | null>(null);
   const [drawRect, setDrawRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [pencilPoints, setPencilPoints] = useState<{ x: number; y: number }[]>([]);
+  const pencilPointsRef = useRef<{ x: number; y: number }[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -120,7 +121,9 @@ function EditablePage({
     if (eraserMode === 'box') {
       setDrawRect({ x: startX, y: startY, width: 0, height: 0 });
     } else {
-      setPencilPoints([{ x: startX, y: startY }]);
+      const initialPoints = [{ x: startX, y: startY }];
+      pencilPointsRef.current = initialPoints;
+      setPencilPoints(initialPoints);
     }
 
     const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
@@ -138,7 +141,9 @@ function EditablePage({
         const h = Math.abs(boundedY - startY);
         setDrawRect({ x, y, width: w, height: h });
       } else {
-        setPencilPoints((prev) => [...prev, { x: boundedX, y: boundedY }]);
+        const newPoints = [...pencilPointsRef.current, { x: boundedX, y: boundedY }];
+        pencilPointsRef.current = newPoints;
+        setPencilPoints(newPoints);
       }
     };
 
@@ -172,12 +177,13 @@ function EditablePage({
           onAddEraser(pageNumber - 1, centerX, centerY, w, h, rect.width, rect.height);
         }
       } else {
-        // Complete freehand pencil stroke
-        if (pencilPoints.length > 1) {
+        // Complete freehand pencil stroke using pointsRef cache to avoid stale closures
+        const finalPoints = pencilPointsRef.current;
+        if (finalPoints.length > 1) {
           onAddLine({
             id: `line-${Date.now()}-${Math.random()}`,
             pageIndex: pageNumber - 1,
-            points: pencilPoints,
+            points: finalPoints,
             thickness: brushThickness,
             color: activeColor,
             renderedWidth: rect.width,
@@ -185,6 +191,7 @@ function EditablePage({
           });
         }
         setPencilPoints([]);
+        pencilPointsRef.current = [];
       }
     };
 
