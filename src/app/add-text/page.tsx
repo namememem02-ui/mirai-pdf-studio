@@ -411,6 +411,18 @@ export default function CombinedPdfEditorPage() {
   const [activeIsBold, setActiveIsBold] = useState(false);
   const [activeIsItalic, setActiveIsItalic] = useState(false);
 
+  // Local state for free typing of font size (to avoid React lock when clearing/deleting)
+  const [fontSizeInput, setFontSizeInput] = useState<string>('16');
+
+  useEffect(() => {
+    const matchedText = textInstances.find((t) => t.id === selectedTextId);
+    if (matchedText) {
+      setFontSizeInput(matchedText.fontSize.toString());
+    } else {
+      setFontSizeInput(activeFontSize.toString());
+    }
+  }, [selectedTextId, activeFontSize, textInstances]);
+
   // Eraser parameters
   const [eraserColor, setEraserColor] = useState('#ffffff');
   const [brushThickness, setBrushThickness] = useState(12);
@@ -972,14 +984,34 @@ export default function CombinedPdfEditorPage() {
                       <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">ขนาดตัวอักษร</label>
                         <input
-                          type="number"
-                          value={selectedText ? selectedText.fontSize : activeFontSize}
+                          type="text"
+                          value={fontSizeInput}
                           onChange={(e) => {
-                            const val = Math.max(8, parseInt(e.target.value) || 12);
+                            const raw = e.target.value;
+                            if (raw === '' || /^\d*$/.test(raw)) {
+                              setFontSizeInput(raw);
+                              const parsed = parseInt(raw, 10);
+                              if (!isNaN(parsed) && parsed >= 4) {
+                                if (selectedText) {
+                                  handleUpdateTextSize(selectedText.id, parsed);
+                                } else {
+                                  setActiveFontSize(parsed);
+                                }
+                              }
+                            }
+                          }}
+                          onBlur={() => {
+                            let parsed = parseInt(fontSizeInput, 10);
+                            if (isNaN(parsed) || parsed < 6) {
+                              parsed = 12;
+                            } else if (parsed > 100) {
+                              parsed = 100;
+                            }
+                            setFontSizeInput(parsed.toString());
                             if (selectedText) {
-                              handleUpdateTextSize(selectedText.id, val);
+                              handleUpdateTextSize(selectedText.id, parsed);
                             } else {
-                              setActiveFontSize(val);
+                              setActiveFontSize(parsed);
                             }
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-pink-500"
