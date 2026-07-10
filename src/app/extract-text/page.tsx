@@ -28,7 +28,7 @@ export default function ExtractTextPage() {
     try {
       const pdfjs = await getPdfjs();
       const doc = await pdfjs.getDocument({
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapUrl: '/cmaps/',
         cMapPacked: true, data: await file.arrayBuffer() }).promise;
       const parts: string[] = [];
       for (let p = 1; p <= doc.numPages; p++) {

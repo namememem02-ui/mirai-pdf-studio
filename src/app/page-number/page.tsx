@@ -56,7 +56,7 @@ export default function PageNumberPage() {
       const buffer = await f.arrayBuffer();
       const pdfjs = await getPdfjs();
       const doc = await pdfjs.getDocument({
-        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapUrl: '/cmaps/',
         cMapPacked: true, data: buffer }).promise;
       setPdfDoc(doc);
       setPageCount(doc.numPages);
