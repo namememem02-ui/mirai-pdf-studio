@@ -139,7 +139,7 @@ export default function Home() {
             </div>
             <button
               onClick={handleInstallClick}
-              className="px-5 py-2.5 bg-pink-650 hover:bg-pink-700 text-xs font-extrabold text-white rounded-xl shadow transition cursor-pointer select-none whitespace-nowrap active:scale-95"
+              className="px-5 py-2.5 bg-pink-600 hover:bg-pink-700 text-xs font-extrabold text-white rounded-xl shadow transition cursor-pointer select-none whitespace-nowrap active:scale-95"
             >
               📲 กดติดตั้งแอปด่วน
             </button>

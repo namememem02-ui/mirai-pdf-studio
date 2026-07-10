@@ -64,7 +64,7 @@ export default function HeaderNav() {
           {isInstallable && (
             <button
               onClick={handleInstallClick}
-              className="flex items-center gap-1 bg-pink-650 hover:bg-pink-700 text-xs font-bold px-2.5 py-1.5 rounded-lg text-white border border-pink-500 transition shadow-sm animate-pulse cursor-pointer"
+              className="flex items-center gap-1 bg-pink-600 hover:bg-pink-700 text-xs font-bold px-2.5 py-1.5 rounded-lg text-white border border-pink-500 transition shadow-sm animate-pulse cursor-pointer"
             >
               📲 ติดตั้งแอป
             </button>
