@@ -15,8 +15,8 @@ const CATEGORIES: ToolCategory[] = [
   {
     title: 'แก้ไขและเซ็นชื่อ (Edit & Sign)',
     icon: '✍️',
-    description: 'เขียนข้อความ ยางลบลบคำเดิม เซ็นลายมือ หรือประทับตราลายน้ำ',
-    ids: ['add-text', 'signature', 'watermark'],
+    description: 'เขียนข้อความ ยางลบลบคำเดิม เซ็นลายมือ ประทับตราลายน้ำ หรือล็อกตั้งรหัสผ่านไฟล์',
+    ids: ['add-text', 'signature', 'watermark', 'protect'],
   },
   {
     title: 'จัดการหน้ากระดาษ (Page Management)',

@@ -92,4 +92,11 @@ export const TOOLS: ToolInfo[] = [
     icon: '📉',
     color: 'bg-rose-100',
   },
+  {
+    id: 'protect',
+    name: 'ตั้งรหัสผ่าน PDF',
+    description: 'ล็อกและตั้งรหัสผ่านเปิดเอกสาร PDF พร้อมควบคุมสิทธิ์การแก้ไขหรือสั่งพิมพ์',
+    icon: '🔒',
+    color: 'bg-slate-100',
+  },
 ];
