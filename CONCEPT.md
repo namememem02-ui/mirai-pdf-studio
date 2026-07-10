@@ -33,6 +33,7 @@
 │   │   ├── add-text/             # [เครื่องมือ] เขียนข้อความ & ยางลบลบคำ (Typewriter & Eraser Workspace)
 │   │   ├── compress/             # [เครื่องมือ] บีบอัด PDF (Image re-compression / Deflate / Rasterize)
 │   │   ├── downloads/            # หน้าประวัติการดาวน์โหลดเอกสารย้อนหลัง
+│   │   ├── excel-to-pdf/         # [เครื่องมือ] แปลง Excel เป็น PDF (SheetJS / jsPDF / AutoTable)
 │   │   ├── extract-text/         # [เครื่องมือ] สกัดตัวอักษร / สแกนรูปถ่ายเป็นตัวหนังสือ (Digital & OCR)
 │   │   ├── merge/                # [เครื่องมือ] รวมไฟล์ PDF หลายไฟล์เข้าด้วยกัน
 │   │   ├── organize/             # [เครื่องมือ] สลับหน้ากระดาษ (Drag & Drop) + แว่นขยายดูหน้าเต็ม
@@ -74,6 +75,9 @@ npm install tesseract.js
 
 # 4. เข้ารหัสไฟล์ ตั้งรหัสผ่าน และควบคุมสิทธิ์ในเบราว์เซอร์
 npm install @pdfsmaller/pdf-encrypt
+
+# 5. แปลงเอกสาร Excel เป็น PDF
+npm install xlsx jspdf jspdf-autotable
 ```
 
 ---
@@ -231,6 +235,47 @@ async function protectDocument(originalBytes: Uint8Array, openPassword: string, 
     }
   }
   ```
+
+### 📌 สูตรที่ 7: แปลง Excel เป็น PDF ตารางเวกเตอร์ คมชัด เลือกข้อความได้ และรองรับภาษาไทย 100%
+การใช้ SheetJS ร่วมกับ jsPDF และ jspdf-autotable เพื่อแปลงข้อมูลใน Excel เป็นตารางเวกเตอร์ใน PDF โดยมีขั้นตอนการฝังฟอนต์ Sarabun เพื่อให้แสดงผลตัวอักษรภาษาไทยได้ถูกต้อง:
+
+```typescript
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+async function convertExcelToPdf(file: File, sheetName: string) {
+  // 1. อ่านข้อมูลชีต Excel ออกมาเป็นโครงสร้าง 2D Array
+  const dataBuffer = await file.arrayBuffer();
+  const workbook = XLSX.read(dataBuffer);
+  const worksheet = workbook.Sheets[sheetName];
+  const rawData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+  // 2. โหลดไบนารีฟอนต์ไทย Sarabun-Regular แปลงเป็น base64
+  const fontBytes = await fetch('/fonts/Sarabun-Regular.ttf').then(res => res.arrayBuffer());
+  const fontBase64 = arrayBufferToBase64(fontBytes); // ฟังก์ชันแปลง ArrayBuffer เป็น Base64
+
+  // 3. เริ่มสร้างไฟล์ PDF และลงทะเบียนฟอนต์ไทย
+  const doc = new jsPDF({ orientation: 'l', format: 'a4' }); // แนะนำ แนวนอน (Landscape)
+  doc.addFileToVFS('Sarabun-Regular.ttf', fontBase64);
+  doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
+  doc.setFont('Sarabun');
+
+  const headers = rawData[0].map(h => String(h || ''));
+  const body = rawData.slice(1).map(row => row.map(cell => String(cell || '')));
+
+  // 4. วาดตารางเวกเตอร์ผ่าน autoTable
+  autoTable(doc, {
+    head: [headers],
+    body: body,
+    styles: { font: 'Sarabun', fontSize: 8 },
+    headStyles: { font: 'Sarabun', fillColor: [15, 23, 42] }
+  });
+
+  // 5. บันทึกไฟล์ผลลัพธ์
+  doc.save('excel_to_pdf.pdf');
+}
+```
 
 ---
 
