@@ -123,6 +123,12 @@ export default function ExcelToPdfPage() {
       const fontBytes = await fontResponse.arrayBuffer();
       const sarabunBase64 = arrayBufferToBase64(fontBytes);
 
+      // Calculate the maximum number of columns in any row
+      const maxCols = Math.max(...cleanData.map(row => row.length));
+
+      // Define columns configuration to support all data columns without cutoff
+      const columns = Array.from({ length: maxCols }, (_, i) => ({ header: '', dataKey: i }));
+
       // Initialize jsPDF document with selected layout page size
       const doc = new jsPDF({
         orientation: orientation,
@@ -135,37 +141,34 @@ export default function ExcelToPdfPage() {
       doc.addFont('Sarabun-Regular.ttf', 'Sarabun', 'normal');
       doc.setFont('Sarabun');
 
-      // The first row will be headers, remaining rows are body
-      const headers = cleanData[0].map(h => h !== undefined ? String(h) : '');
-      const body = cleanData.slice(1).map(row => 
-        row.map(cell => cell !== undefined ? String(cell) : '')
-      );
+      // Map rows data to match the column indices
+      const body = cleanData.map(row => {
+        const rowData: Record<number, string> = {};
+        for (let i = 0; i < maxCols; i++) {
+          rowData[i] = row[i] !== undefined && row[i] !== null ? String(row[i]) : '';
+        }
+        return rowData;
+      });
 
-      // Generate PDF Vector Table
+      // Generate PDF Vector Table representing the spreadsheet grid
       autoTable(doc, {
-        head: [headers],
+        columns: columns,
         body: body,
+        showHead: 'never',          // Hide empty dummy headers
+        theme: 'grid',              // Draw thin border lines like Excel gridlines
         startY: 15,
         margin: { top: 15, right: 10, bottom: 15, left: 10 },
         styles: {
           font: 'Sarabun',          // Support Thai cell fonts
-          fontSize: 8,
-          cellPadding: 2,
+          fontSize: 7,
+          cellPadding: 1.5,
+          lineColor: [203, 213, 225], // Light slate gray border for gridlines
+          lineWidth: 0.1,
+          textColor: [51, 65, 85],   // Slate-700 readable text color
         },
-        headStyles: {
-          font: 'Sarabun',          // Support Thai header fonts
-          fillColor: [15, 23, 42],  // Slate-900 corporate theme
-          textColor: [255, 255, 255],
-          fontSize: 9,
-          fontStyle: 'normal',
+        alternateRowStyles: {
+          fillColor: [248, 250, 252], // Subtle zebra striping (slate-50)
         },
-        // Auto-scale column widths if fitToWidth is checked
-        columnStyles: fitToWidth ? undefined : {
-          // If not fitToWidth, let autotable do auto widths based on cell content size
-        },
-        didParseCell: (data) => {
-          // Additional custom styles can go here
-        }
       });
 
       const outName = `${baseName(file!.name)}_${selectedSheet}.pdf`;
