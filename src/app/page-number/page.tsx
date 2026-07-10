@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
+import fontkit from '@pdf-lib/fontkit';
 import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
@@ -54,7 +55,9 @@ export default function PageNumberPage() {
     try {
       const buffer = await f.arrayBuffer();
       const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({ data: buffer }).promise;
+      const doc = await pdfjs.getDocument({
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapPacked: true, data: buffer }).promise;
       setPdfDoc(doc);
       setPageCount(doc.numPages);
 
@@ -121,7 +124,21 @@ export default function PageNumberPage() {
 
     try {
       const doc = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
-      const font = await doc.embedFont(StandardFonts.Helvetica);
+      // Fetch local Sarabun-Regular font to support Thai characters
+      let fontBytes: ArrayBuffer | null = null;
+      try {
+        const res = await fetch('/fonts/Sarabun-Regular.ttf');
+        if (res.ok) {
+          fontBytes = await res.arrayBuffer();
+        }
+      } catch (err) {
+        console.warn('Failed to load local Sarabun-Regular font, fallback to Helvetica', err);
+      }
+
+      doc.registerFontkit(fontkit);
+      const font = fontBytes
+        ? await doc.embedFont(fontBytes, { subset: true })
+        : await doc.embedFont(StandardFonts.Helvetica);
 
       const total = doc.getPageCount();
       for (let i = 0; i < total; i++) {

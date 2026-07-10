@@ -35,7 +35,9 @@ export default function PdfToImagePage() {
     setError(null);
     try {
       const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+      const doc = await pdfjs.getDocument({
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapPacked: true, data: await file.arrayBuffer() }).promise;
       const out: PageImage[] = [];
       for (let p = 1; p <= doc.numPages; p++) {
         setProgress(`กำลังแปลงหน้า ${p} / ${doc.numPages}…`);

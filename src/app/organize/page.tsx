@@ -57,7 +57,9 @@ export default function OrganizePage() {
       }));
 
       const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
+      const doc = await pdfjs.getDocument({
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapPacked: true, data: buffer.slice(0) }).promise;
       const count = doc.numPages;
 
       const newItems: OrganizePageItem[] = [];

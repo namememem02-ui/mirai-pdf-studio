@@ -458,10 +458,10 @@ export default function CombinedPdfEditorPage() {
       }
     };
 
-    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Regular.ttf', setThaiFontRegular);
-    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Bold.ttf', setThaiFontBold);
-    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-Italic.ttf', setThaiFontItalic);
-    loadFont('https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/sarabun/Sarabun-BoldItalic.ttf', setThaiFontBoldItalic);
+    loadFont('/fonts/Sarabun-Regular.ttf', setThaiFontRegular);
+    loadFont('/fonts/Sarabun-Bold.ttf', setThaiFontBold);
+    loadFont('/fonts/Sarabun-Italic.ttf', setThaiFontItalic);
+    loadFont('/fonts/Sarabun-BoldItalic.ttf', setThaiFontBoldItalic);
   }, []);
 
   const pick = async (files: File[]) => {
@@ -485,7 +485,9 @@ export default function CombinedPdfEditorPage() {
     try {
       const buffer = await f.arrayBuffer();
       const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({ data: buffer.slice(0) }).promise;
+      const doc = await pdfjs.getDocument({
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapPacked: true, data: buffer.slice(0) }).promise;
       setPdfDoc(doc);
       setPageCount(doc.numPages);
     } catch (err) {

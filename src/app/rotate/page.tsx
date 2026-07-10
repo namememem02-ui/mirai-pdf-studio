@@ -44,7 +44,9 @@ export default function RotatePage() {
     try {
       const buffer = await f.arrayBuffer();
       const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({ data: buffer }).promise;
+      const doc = await pdfjs.getDocument({
+        cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/cmaps/',
+        cMapPacked: true, data: buffer }).promise;
       const count = doc.numPages;
       setPageCount(count);
 
