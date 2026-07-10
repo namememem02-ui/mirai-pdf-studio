@@ -85,4 +85,11 @@ export const TOOLS: ToolInfo[] = [
     icon: '📝',
     color: 'bg-violet-100',
   },
+  {
+    id: 'compress',
+    name: 'บีบอัด PDF',
+    description: 'ลดขนาดไฟล์ PDF ให้เล็กลงโดยการบีบอัดคุณภาพไฟล์รูปภาพประกอบ',
+    icon: '📉',
+    color: 'bg-rose-100',
+  },
 ];

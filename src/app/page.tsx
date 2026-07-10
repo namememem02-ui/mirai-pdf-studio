@@ -27,8 +27,8 @@ const CATEGORIES: ToolCategory[] = [
   {
     title: 'แปลงไฟล์และถอดข้อมูล (Conversion & OCR)',
     icon: '🔄',
-    description: 'แปลงรูปภาพเป็น PDF, แปลงหน้า PDF เป็นไฟล์รูปภาพ หรือดึงข้อความ OCR',
-    ids: ['image-to-pdf', 'pdf-to-image', 'extract-text'],
+    description: 'แปลงรูปภาพเป็น PDF, แปลงหน้า PDF เป็นไฟล์รูปภาพ, ดึงข้อความ OCR หรือบีบอัดขนาดไฟล์',
+    ids: ['image-to-pdf', 'pdf-to-image', 'extract-text', 'compress'],
   },
 ];
 
