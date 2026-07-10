@@ -371,16 +371,18 @@ export default function WatermarkPage() {
             </div>
 
             {/* Preview panel */}
-            <div className="md:col-span-7 flex flex-col items-center">
+            <div className="md:col-span-7 flex flex-col items-center w-full min-w-0">
               <span className="text-xs text-gray-400 mb-2 font-semibold">👀 ตัวอย่างหน้าแรก (First Page Preview)</span>
-              <div
-                className="relative border border-gray-300 shadow-md bg-white overflow-hidden"
-                style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
-              >
-                <canvas ref={canvasRef} />
-                
-                {/* Visual Watermark Overlay */}
-                <div style={getPositionStyles()}>{text}</div>
+              <div className="w-full overflow-x-auto flex justify-center py-4 bg-gray-50/50 rounded-xl border border-gray-200">
+                <div
+                  className="relative border border-gray-300 shadow-md bg-white overflow-hidden flex-shrink-0"
+                  style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
+                >
+                  <canvas ref={canvasRef} className="block" />
+                  
+                  {/* Visual Watermark Overlay */}
+                  <div style={getPositionStyles()}>{text}</div>
+                </div>
               </div>
             </div>
           </div>

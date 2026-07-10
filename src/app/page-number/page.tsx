@@ -328,23 +328,25 @@ export default function PageNumberPage() {
             </div>
 
             {/* Preview panel */}
-            <div className="md:col-span-7 flex flex-col items-center">
+            <div className="md:col-span-7 flex flex-col items-center w-full min-w-0">
               <span className="text-xs text-gray-400 mb-2 font-semibold">👀 ตัวอย่างตำแหน่งเลขหน้า (หน้าแรก)</span>
-              <div
-                className="relative border border-gray-300 shadow-md bg-white overflow-hidden"
-                style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
-              >
-                <canvas ref={canvasRef} />
-                
-                {/* Visual Overlay */}
-                {startPage === 1 && (
-                  <div style={getPositionStyles()}>{getFormatText(1)}</div>
-                )}
-                {startPage > 1 && (
-                  <div className="absolute inset-x-0 bottom-4 text-center text-[10px] text-gray-400 bg-gray-50/80 py-1">
-                    ⚠️ หน้าแรกเว้นการใส่เลขตามตัวเลือก (จะเริ่มพิมพ์ตั้งแต่หน้า {startPage})
-                  </div>
-                )}
+              <div className="w-full overflow-x-auto flex justify-center py-4 bg-gray-50/50 rounded-xl border border-gray-200">
+                <div
+                  className="relative border border-gray-300 shadow-md bg-white overflow-hidden flex-shrink-0"
+                  style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
+                >
+                  <canvas ref={canvasRef} className="block" />
+                  
+                  {/* Visual Overlay */}
+                  {startPage === 1 && (
+                    <div style={getPositionStyles()}>{getFormatText(1)}</div>
+                  )}
+                  {startPage > 1 && (
+                    <div className="absolute inset-x-0 bottom-4 text-center text-[10px] text-gray-400 bg-gray-50/80 py-1">
+                      ⚠️ หน้าแรกเว้นการใส่เลขตามตัวเลือก (จะเริ่มพิมพ์ตั้งแต่หน้า {startPage})
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
