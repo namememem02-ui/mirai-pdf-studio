@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "PDF Support — เครื่องมือจัดการ PDF ฟรี",
   description:
     "รวมไฟล์ แยกหน้า หมุน แปลงรูปภาพ และดึงข้อความจาก PDF — ทำงานในเบราว์เซอร์ของคุณทั้งหมด ไฟล์ไม่ถูกอัปโหลด",
+  manifest: "/manifest.json",
 };
 
 export default function RootLayout({
@@ -26,6 +27,23 @@ export default function RootLayout({
             </div>
           </footer>
         </DownloadQueueProvider>
+
+        {/* Register custom Service Worker for offline PWA support */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                    console.log('ServiceWorker registered:', reg.scope);
+                  }).catch(function(err) {
+                    console.error('ServiceWorker registration failed:', err);
+                  });
+                });
+              }
+            `
+          }}
+        />
       </body>
     </html>
   );
