@@ -1,10 +1,42 @@
 'use client';
 
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 export default function HeaderNav() {
   const { queue } = useDownloadQueue();
+
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    }
+  };
 
   return (
     <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-10 shadow-sm text-white">
@@ -27,6 +59,16 @@ export default function HeaderNav() {
               </span>
             )}
           </Link>
+
+          {/* Quick PWA Install Button */}
+          {isInstallable && (
+            <button
+              onClick={handleInstallClick}
+              className="flex items-center gap-1 bg-pink-650 hover:bg-pink-700 text-xs font-bold px-2.5 py-1.5 rounded-lg text-white border border-pink-500 transition shadow-sm animate-pulse cursor-pointer"
+            >
+              📲 ติดตั้งแอป
+            </button>
+          )}
         </div>
 
         <span className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5 font-semibold">

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TOOLS } from '@/lib/tools';
 import ToolCard from '@/components/ToolCard';
 
@@ -34,6 +34,37 @@ const CATEGORIES: ToolCategory[] = [
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
+
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstallable(false);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setIsInstallable(false);
+    }
+  };
 
   const query = searchQuery.trim().toLowerCase();
 
@@ -95,6 +126,25 @@ export default function Home() {
             </div>
           </div>
         </div>
+
+        {/* PWA Install Banner */}
+        {isInstallable && (
+          <div className="max-w-xl mx-auto bg-slate-900 text-white border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn text-left">
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">⭐ แนะนำการติดตั้ง</span>
+              <h3 className="text-sm font-bold">ติดตั้งโปรแกรม Mirai PDF Studio ลงเครื่อง</h3>
+              <p className="text-[10px] text-slate-400 leading-normal">
+                เพื่อเรียกใช้งานด่วนผ่านไอคอนหน้าจอเดสก์ท็อป/โทรศัพท์มือถือ และรันเอกสารแบบออฟไลน์ไร้เน็ตได้สมบูรณ์แบบ
+              </p>
+            </div>
+            <button
+              onClick={handleInstallClick}
+              className="px-5 py-2.5 bg-pink-650 hover:bg-pink-700 text-xs font-extrabold text-white rounded-xl shadow transition cursor-pointer select-none whitespace-nowrap active:scale-95"
+            >
+              📲 กดติดตั้งแอปด่วน
+            </button>
+          </div>
+        )}
 
         {/* Real-time Search input */}
         <div className="max-w-md mx-auto pt-4 relative">
