@@ -79,13 +79,6 @@ export const TOOLS: ToolInfo[] = [
     color: 'bg-pink-100',
   },
   {
-    id: 'erase-text',
-    name: 'ลบข้อความเดิม PDF',
-    description: 'ถมสีกรอบทับตัวอักษรหรือภาพเพื่อลบออก (รวมอยู่ในพื้นที่เครื่องมือเขียนและลบข้อความร่วมกัน)',
-    icon: '🧼',
-    color: 'bg-yellow-100',
-  },
-  {
     id: 'extract-text',
     name: 'ดึงข้อความจาก PDF',
     description: 'คัดลอกข้อความทั้งหมดในเอกสาร หรือบันทึกเป็นไฟล์ .txt',

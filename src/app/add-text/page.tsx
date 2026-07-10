@@ -407,7 +407,7 @@ export default function CombinedPdfEditorPage() {
   // Typewriter parameters
   const [activeText, setActiveText] = useState('ข้อความใหม่');
   const [activeFontSize, setActiveFontSize] = useState(16);
-  const [activeColor, setActiveColor] = useState('#ff0055');
+  const [activeColor, setActiveColor] = useState('#000000');
   const [activeIsBold, setActiveIsBold] = useState(false);
   const [activeIsItalic, setActiveIsItalic] = useState(false);
 
