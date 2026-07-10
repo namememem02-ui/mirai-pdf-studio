@@ -51,7 +51,7 @@ export default function ExtractTextPage() {
         worker = await createWorker('tha+eng', 1, {
           workerPath: '/tesseract/worker.min.js',
           langPath: '/tesseract',
-          corePath: '/tesseract/tesseract-core.js'
+          corePath: '/tesseract' // directory: let tesseract.js pick the faster SIMD core when supported
         });
       }
 
