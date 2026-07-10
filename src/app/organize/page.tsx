@@ -34,6 +34,10 @@ export default function OrganizePage() {
   const [resultItemId, setResultItemId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
 
+  // Drag and drop & zoom lightbox states
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [zoomedItem, setZoomedItem] = useState<OrganizePageItem | null>(null);
+
   const insertPdfInputRef = useRef<HTMLInputElement>(null);
   const insertImageInputRef = useRef<HTMLInputElement>(null);
 
@@ -59,14 +63,16 @@ export default function OrganizePage() {
       const pdfjs = await getPdfjs();
       const doc = await pdfjs.getDocument({
         cMapUrl: '/cmaps/',
-        cMapPacked: true, data: buffer.slice(0) }).promise;
+        cMapPacked: true,
+        data: buffer.slice(0)
+      }).promise;
       const count = doc.numPages;
 
       const newItems: OrganizePageItem[] = [];
       for (let i = 0; i < count; i++) {
-        setProgress(`กำลังอ่านและพรีวิวหน้า ${i + 1} จาก ${count} ของไฟล์ ${f.name}...`);
+        setProgress(`กำลังอ่านประมวลผลหน้าพรีวิว ${i + 1} จากทั้งหมด ${count} ของไฟล์ ${f.name}...`);
         const page = await doc.getPage(i + 1);
-        const viewport = page.getViewport({ scale: 0.35 });
+        const viewport = page.getViewport({ scale: 0.8 }); // Higher scale for sharp zoom viewing
         const canvas = document.createElement('canvas');
         canvas.width = viewport.width;
         canvas.height = viewport.height;
@@ -79,7 +85,7 @@ export default function OrganizePage() {
           fileId,
           fileName: f.name,
           originalIndex: i,
-          thumbnail: canvas.toDataURL(),
+          thumbnail: canvas.toDataURL('image/png'),
           rotation: 0,
         });
       }
@@ -202,7 +208,7 @@ export default function OrganizePage() {
       return;
     }
     setBusy(true);
-    setProgress('กำลังประมวลผลและสร้างไฟล์ PDF ใหม่...');
+    setProgress('กำลังประมวลผลจัดทำโครงสร้างหน้ากระดาษและบันทึกไฟล์ PDF ใหม่...');
     setError(null);
     setDone(false);
     setResultItemId(null);
@@ -266,7 +272,7 @@ export default function OrganizePage() {
       <PageHeader
         icon="📋"
         title="จัดระเบียบหน้า PDF (Page Organizer)"
-        description="ปรับแต่งไฟล์อย่างสมบูรณ์แบบ — ลากสลับลำดับหน้า, หมุน, ลบ, แทรกหน้าว่าง หรือแทรกไฟล์ PDF/รูปภาพเพิ่มเติมในคิวหน้าได้แบบในโปรแกรม PDFgear"
+        description="ลากสลับเรียงลำดับหน้ากระดาษอย่างอิสระ หมุนทิศทาง หรือแทรกหน้ากระดาษว่าง/รูปภาพ เพิ่มเติมในเอกสารได้ทันที"
       />
 
       <div className="space-y-6">
@@ -278,7 +284,7 @@ export default function OrganizePage() {
 
         {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
         {progress && (
-          <div className="text-blue-600 text-sm flex items-center gap-2 font-medium bg-blue-50 p-3 rounded-lg">
+          <div className="text-blue-600 text-sm flex items-center gap-2 font-medium bg-blue-50 p-3 rounded-lg border border-blue-100 shadow-sm animate-pulse">
             <span className="animate-spin text-lg">⏳</span>
             {progress}
           </div>
@@ -301,7 +307,7 @@ export default function OrganizePage() {
         />
 
         {items.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6 shadow-sm">
             {/* Toolbar section */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
               <span className="text-sm font-bold text-gray-700">แทรกหน้าเนื้อหาเพิ่มเติม:</span>
@@ -343,7 +349,25 @@ export default function OrganizePage() {
               {items.map((item, i) => (
                 <div
                   key={item.id}
-                  className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between hover:shadow-md transition relative group"
+                  draggable={!busy}
+                  onDragStart={() => setDraggedIndex(i)}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDragEnter={() => {
+                    if (draggedIndex !== null && draggedIndex !== i) {
+                      setItems((prev) => {
+                        const next = [...prev];
+                        const temp = next[draggedIndex];
+                        next.splice(draggedIndex, 1);
+                        next.splice(i, 0, temp);
+                        return next;
+                      });
+                      setDraggedIndex(i);
+                    }
+                  }}
+                  onDragEnd={() => setDraggedIndex(null)}
+                  className={`bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between hover:shadow-md transition relative group cursor-grab active:cursor-grabbing select-none ${
+                    draggedIndex === i ? 'opacity-40 border-pink-500 scale-95' : ''
+                  }`}
                 >
                   <div>
                     {/* Thumbnail Viewport */}
@@ -374,10 +398,24 @@ export default function OrganizePage() {
                         />
                       )}
                       
+                      {/* Zoom/Preview overlay button */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setZoomedItem(item);
+                        }}
+                        className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-xs font-bold gap-1 cursor-pointer z-10 rounded-lg"
+                      >
+                        🔍 คลิกขยายใหญ่
+                      </button>
+
                       {/* Delete absolute button */}
                       <button
-                        onClick={() => remove(i)}
-                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-50 text-red-500 border border-red-100 flex items-center justify-center text-xs hover:bg-red-500 hover:text-white transition cursor-pointer active:scale-90 z-20"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          remove(i);
+                        }}
+                        className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-50 text-red-500 border border-red-100 flex items-center justify-center text-xs hover:bg-red-550 hover:text-white transition cursor-pointer active:scale-90 z-20 shadow-sm"
                         title="ลบหน้านี้ออก"
                       >
                         ✕
@@ -400,7 +438,10 @@ export default function OrganizePage() {
                   <div className="flex items-center justify-between border-t border-gray-200/50 mt-3 pt-2">
                     <div className="flex gap-1">
                       <button
-                        onClick={() => move(i, -1)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          move(i, -1);
+                        }}
                         disabled={i === 0}
                         className="w-6 h-6 rounded border border-gray-200 bg-white text-xs text-gray-700 flex items-center justify-center hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         title="ย้ายไปซ้าย"
@@ -408,7 +449,10 @@ export default function OrganizePage() {
                         ←
                       </button>
                       <button
-                        onClick={() => move(i, 1)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          move(i, 1);
+                        }}
                         disabled={i === items.length - 1}
                         className="w-6 h-6 rounded border border-gray-200 bg-white text-xs text-gray-700 flex items-center justify-center hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
                         title="ย้ายไปขวา"
@@ -418,7 +462,10 @@ export default function OrganizePage() {
                     </div>
 
                     <button
-                      onClick={() => rotate(i)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        rotate(i);
+                      }}
                       className="px-2 h-6 rounded border border-gray-200 bg-white text-[10px] font-semibold text-gray-600 flex items-center gap-1 hover:bg-gray-100 cursor-pointer active:scale-95"
                       title="หมุนหน้านี้ 90°"
                     >
@@ -468,6 +515,59 @@ export default function OrganizePage() {
           onClose={() => setPreviewItem(null)}
           onDownload={() => downloadItem(previewItem.id)}
         />
+      )}
+
+      {/* Lightbox zoomed view modal */}
+      {zoomedItem && (
+        <div
+          className="fixed inset-0 bg-black/85 flex items-center justify-center p-4 z-50 animate-fadeIn"
+          onClick={() => setZoomedItem(null)}
+        >
+          <div
+            className="relative bg-white rounded-2xl max-w-lg w-full p-5 shadow-2xl flex flex-col max-h-[85vh] animate-scaleUp"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-4">
+              <h4 className="text-xs font-bold text-gray-800 truncate max-w-[80%]">
+                🔍 ขยายพรีวิวหน้ากระดาษ: {zoomedItem.type === 'pdf' ? zoomedItem.fileName : 'กระดาษจัดระเบียบ'}
+              </h4>
+              <button
+                onClick={() => setZoomedItem(null)}
+                className="w-8 h-8 rounded-full hover:bg-gray-150 text-gray-500 text-sm font-bold flex items-center justify-center cursor-pointer transition active:scale-90"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-50 rounded-xl p-3 border border-gray-200 min-h-[350px]">
+              {zoomedItem.type === 'pdf' && zoomedItem.thumbnail && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={zoomedItem.thumbnail}
+                  alt="ขยายหน้า"
+                  className="max-w-full max-h-[60vh] object-contain shadow-md rounded-lg"
+                  style={{ transform: `rotate(${zoomedItem.rotation}deg)` }}
+                />
+              )}
+              {zoomedItem.type === 'blank' && (
+                <div className="w-full h-[400px] flex items-center justify-center bg-white border border-dashed border-gray-300 rounded-lg shadow-sm">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                    กระดาษว่างเปล่า A4
+                  </span>
+                </div>
+              )}
+              {zoomedItem.type === 'image' && zoomedItem.imageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={zoomedItem.imageUrl}
+                  alt="ขยายรูปภาพ"
+                  className="max-w-full max-h-[60vh] object-contain shadow-md rounded-lg"
+                  style={{ transform: `rotate(${zoomedItem.rotation}deg)` }}
+                />
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
