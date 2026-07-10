@@ -47,8 +47,12 @@ export default function ExtractTextPage() {
       const parts: string[] = [];
 
       if (useOcr) {
-        setProgress('กำลังดาวน์โหลดฐานข้อมูลภาษาไทยและภาษาอังกฤษ (OCR)...');
-        worker = await createWorker('tha+eng');
+        setProgress('กำลังโหลดโมเดลภาษาไทยและภาษาอังกฤษจากฐานข้อมูลภายในเครื่อง (Local OCR)...');
+        worker = await createWorker('tha+eng', 1, {
+          workerPath: '/tesseract/worker.min.js',
+          langPath: '/tesseract',
+          corePath: '/tesseract/tesseract-core.js'
+        });
       }
 
       for (let p = 1; p <= doc.numPages; p++) {
