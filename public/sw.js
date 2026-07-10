@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pdf-support-cache-v1';
+const CACHE_NAME = 'pdf-support-cache-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/manifest.json',
@@ -33,18 +33,31 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET' || !event.request.url.startsWith(self.location.origin)) {
+  const url = event.request.url;
+
+  // Bypass non-GET, cross-origin, and Next.js development hot-reloading sockets/HMR/SSE
+  if (
+    event.request.method !== 'GET' ||
+    !url.startsWith(self.location.origin) ||
+    url.includes('_next/webpack-hmr') ||
+    url.includes('webpack-hot-update') ||
+    url.includes('/_next/static/development/') ||
+    url.includes('ws://') ||
+    url.includes('wss://')
+  ) {
     return;
   }
 
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch new version in background to update cache
+        // Fetch new version in background to update cache (stale-while-revalidate)
+        // CRITICAL FIX: Clone the network response before writing to cache to avoid consuming stream
         fetch(event.request)
           .then((networkResponse) => {
             if (networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, networkResponse));
+              const responseToCache = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseToCache));
             }
           })
           .catch(() => {});
