@@ -28,18 +28,30 @@ export default function RootLayout({
           </footer>
         </DownloadQueueProvider>
 
-        {/* Register custom Service Worker for offline PWA support */}
+        {/* Register/Unregister Service Worker for offline PWA support */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
-                window.addEventListener('load', function() {
-                  navigator.serviceWorker.register('/sw.js').then(function(reg) {
-                    console.log('ServiceWorker registered:', reg.scope);
-                  }).catch(function(err) {
-                    console.error('ServiceWorker registration failed:', err);
+              if ('serviceWorker' in navigator) {
+                if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+                  // Actively unregister local worker to flush buggy dev caches
+                  navigator.serviceWorker.getRegistrations().then(function(regs) {
+                    for (var i = 0; i < regs.length; i++) {
+                      regs[i].unregister().then(function(ok) {
+                        if (ok) console.log('Cleaned up local dev service worker.');
+                      });
+                    }
                   });
-                });
+                } else {
+                  // Register standard worker in production
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                      console.log('ServiceWorker registered:', reg.scope);
+                    }).catch(function(err) {
+                      console.error('ServiceWorker registration failed:', err);
+                    });
+                  });
+                }
               }
             `
           }}
