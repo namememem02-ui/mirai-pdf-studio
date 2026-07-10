@@ -4,9 +4,9 @@ import { DownloadQueueProvider } from "@/context/DownloadQueueContext";
 import HeaderNav from "@/components/HeaderNav";
 
 export const metadata: Metadata = {
-  title: "PDF Support — เครื่องมือจัดการ PDF ฟรี",
+  title: "Mirai PDF Studio — เครื่องมือจัดการเอกสาร PDF ความปลอดภัยสูง",
   description:
-    "รวมไฟล์ แยกหน้า หมุน แปลงรูปภาพ และดึงข้อความจาก PDF — ทำงานในเบราว์เซอร์ของคุณทั้งหมด ไฟล์ไม่ถูกอัปโหลด",
+    "เขียนและลบข้อความ เซ็นลายเซ็น บีบอัด ใส่รหัสผ่าน และจัดการหน้า PDF ในเครื่อง 100% ปลอดภัย ไม่ผ่านคลาวด์ ออฟไลน์สมบูรณ์แบบ",
   manifest: "/manifest.json",
 };
 
@@ -15,15 +15,15 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="th">
-      <body className="min-h-screen flex flex-col">
+      <body className="min-h-screen flex flex-col bg-gray-50">
         <DownloadQueueProvider>
           <HeaderNav />
 
           <div className="flex-1">{children}</div>
 
           <footer className="border-t border-gray-200 bg-white">
-            <div className="max-w-5xl mx-auto px-4 py-4 text-center text-xs text-gray-400">
-              🔒 ไฟล์ของคุณไม่ถูกอัปโหลดขึ้นเซิร์ฟเวอร์ — ประมวลผลในเบราว์เซอร์ของคุณทั้งหมด
+            <div className="max-w-5xl mx-auto px-4 py-4 text-center text-xs text-gray-400 font-semibold">
+              🔒 Mirai PDF Studio — ข้อมูลของคุณปลอดภัย ประมวลผลและเข้ารหัสในเครื่องคุณ 100% โดยไม่ผ่านคลาวด์เซิร์ฟเวอร์
             </div>
           </footer>
         </DownloadQueueProvider>

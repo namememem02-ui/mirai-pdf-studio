@@ -13,21 +13,21 @@ interface ToolCategory {
 
 const CATEGORIES: ToolCategory[] = [
   {
-    title: 'แก้ไขและเซ็นชื่อ (Edit & Sign)',
+    title: 'แก้ไขเนื้อหาและสิทธิ์ความปลอดภัย (Edit & Secure)',
     icon: '✍️',
-    description: 'เขียนข้อความ ยางลบลบคำเดิม เซ็นลายมือ ประทับตราลายน้ำ หรือล็อกตั้งรหัสผ่านไฟล์',
+    description: 'เขียนและลบข้อความเดิม ปั๊มลายเซ็น ปั๊มลายน้ำ หรือล็อกรหัสผ่านเอกสารป้องกันสิทธิ์',
     ids: ['add-text', 'signature', 'watermark', 'protect'],
   },
   {
-    title: 'จัดการหน้ากระดาษ (Page Management)',
+    title: 'จัดเรียงลำดับและหน้าเอกสาร (Page Layout & Margins)',
     icon: '📄',
-    description: 'รวมไฟล์ แยกหน้าเอกสาร สลับลำดับหน้า หมุนกระดาษ หรือใส่เลขหน้า',
+    description: 'รวมไฟล์ แยกหน้า ลบ/แทรกจัดลำดับหน้า หมุนกระดาษ หรือแสตมป์รหัสหมายเลขหน้า',
     ids: ['merge', 'split', 'organize', 'rotate', 'page-number'],
   },
   {
-    title: 'แปลงไฟล์และถอดข้อมูล (Conversion & OCR)',
+    title: 'แปลงไฟล์และถอดอักษรภาษาไทย (Convert & OCR)',
     icon: '🔄',
-    description: 'แปลงรูปภาพเป็น PDF, แปลงหน้า PDF เป็นไฟล์รูปภาพ, ดึงข้อความ OCR หรือบีบอัดขนาดไฟล์',
+    description: 'แปลงรูปภาพเป็น PDF, แปลงหน้า PDF เป็นไฟล์รูปภาพ, บีบอัดขนาดไฟล์ หรือถอดตัวอักษรภาพสแกน OCR',
     ids: ['image-to-pdf', 'pdf-to-image', 'extract-text', 'compress'],
   },
 ];
@@ -47,28 +47,68 @@ export default function Home() {
   });
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-10">
-      <div className="text-center mb-10 space-y-3">
-        <h1 className="text-3xl md:text-4xl font-extrabold text-gray-800 tracking-tight">
-          🛠️ เครื่องมือจัดการ PDF ครบวงจร
-        </h1>
-        <p className="text-sm text-gray-500 max-w-xl mx-auto leading-relaxed">
-          รันตรงในเครื่องคุณ 100% ไฟล์ปลอดภัย ไม่ต้องอัปโหลดขึ้นเซิร์ฟเวอร์ สะดวก รวดเร็ว และเป็นส่วนตัว
-        </p>
+    <main className="max-w-5xl mx-auto px-4 py-12 space-y-12">
+      
+      {/* Official Hero Section */}
+      <div className="text-center space-y-6">
+        <div className="space-y-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-[10px] font-bold tracking-wider uppercase shadow-sm">
+            ✨ Professional Web Application
+          </span>
+          <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
+            Mirai PDF Studio
+          </h1>
+          <p className="text-xs text-slate-500 max-w-xl mx-auto leading-relaxed">
+            สตูดิโอจัดการเอกสาร PDF ความปลอดภัยสูง ประมวลผลและเข้ารหัสเสร็จสรรพในเครื่องคอมพิวเตอร์ของคุณ 100% โดยไม่ต้องอัปโหลดขึ้นเซิร์ฟเวอร์
+          </p>
+        </div>
+
+        {/* Unique Selling Points (USP) Banner - Formal & Sleek */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto pt-4 text-left">
+          <div className="bg-white border border-slate-200 rounded-xl p-4 flex gap-3 shadow-sm hover:shadow transition">
+            <span className="text-2xl text-slate-700 select-none">🔒</span>
+            <div className="space-y-1">
+              <h3 className="text-xs font-bold text-slate-800">ข้อมูลปลอดภัย 100% (Client-Side)</h3>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                เอกสารถูกประมวลผลบนเครื่องของคุณเท่านั้น ไฟล์ไม่ผ่านอินเทอร์เน็ตหรือคลาวด์ ป้องกันการรั่วไหลเด็ดขาด
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-4 flex gap-3 shadow-sm hover:shadow transition">
+            <span className="text-2xl text-slate-700 select-none">🔌</span>
+            <div className="space-y-1">
+              <h3 className="text-xs font-bold text-slate-800">รองรับระบบออฟไลน์ (PWA Ready)</h3>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                ติดตั้งเป็นโปรแกรมลงบนเครื่องคอมพิวเตอร์หรือโทรศัพท์มือถือ เพื่อเรียกใช้งานได้ทันทีแม้ไม่มีเน็ต
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-slate-200 rounded-xl p-4 flex gap-3 shadow-sm hover:shadow transition">
+            <span className="text-2xl text-slate-700 select-none">⚡</span>
+            <div className="space-y-1">
+              <h3 className="text-xs font-bold text-slate-800">ประมวลผลทันที ไร้ค่าเซิร์ฟเวอร์</h3>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                ไม่ต้องรอต่อคิวส่งขึ้นคลาวด์ ประมวลผลเร็วกว่าด้วยกำลังประมวลผลในเครื่อง และใช้งานได้ฟรีโดยไม่มีข้อจำกัด
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* Real-time Search input */}
         <div className="max-w-md mx-auto pt-4 relative">
           <input
             type="text"
-            placeholder="🔍 ค้นหาเครื่องมือ เช่น รวมไฟล์, ลบข้อความ, เซ็นชื่อ, OCR..."
+            placeholder="🔍 พิมพ์คำค้นหาเครื่องมือ เช่น รวมไฟล์, ลบข้อความ, เซ็นชื่อ, บีบอัด, ล็อกรหัสผ่าน..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full border border-gray-300 rounded-full px-5 py-2.5 text-xs focus:outline-none focus:border-pink-500 focus:ring-2 focus:ring-pink-500/10 shadow-sm transition"
+            className="w-full border border-slate-300 rounded-full px-5 py-2.5 text-xs focus:outline-none focus:border-slate-800 focus:ring-2 focus:ring-slate-900/10 shadow-sm bg-white transition"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs font-bold"
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
             >
               ✕ ล้าง
             </button>
@@ -76,17 +116,18 @@ export default function Home() {
         </div>
       </div>
 
-      <div className="space-y-10">
+      {/* Grid Categories */}
+      <div className="space-y-12">
         {CATEGORIES.map((cat) => {
           const catTools = filteredTools.filter((t) => cat.ids.includes(t.id));
           if (catTools.length === 0) return null;
 
           return (
-            <div key={cat.title} className="space-y-4">
-              <div className="border-b border-gray-200 pb-2 flex items-baseline gap-2">
-                <span className="text-base">{cat.icon}</span>
-                <h2 className="text-sm font-bold text-gray-800">{cat.title}</h2>
-                <span className="text-[10px] text-gray-400">({cat.description})</span>
+            <div key={cat.title} className="space-y-4 animate-fadeIn">
+              <div className="border-l-4 border-slate-800 pl-3 pb-0.5 flex items-baseline gap-2">
+                <span className="text-sm">{cat.icon}</span>
+                <h2 className="text-xs font-extrabold text-slate-950 tracking-tight">{cat.title}</h2>
+                <span className="text-[10px] text-slate-400 font-medium">({cat.description})</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {catTools.map((tool) => (
@@ -98,8 +139,8 @@ export default function Home() {
         })}
 
         {filteredTools.length === 0 && (
-          <div className="text-center py-10 text-xs text-gray-400 font-medium">
-            🔍 ไม่พบเครื่องมือที่ตรงกับคำค้นหาของคุณ
+          <div className="text-center py-12 text-xs text-slate-400 font-medium">
+            🔍 ไม่พบชุดเครื่องมือที่เกี่ยวข้องกับคำค้นหาของคุณ
           </div>
         )}
       </div>

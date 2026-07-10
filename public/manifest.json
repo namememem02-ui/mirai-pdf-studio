@@ -1,11 +1,11 @@
 {
-  "name": "PDF Support",
-  "short_name": "PDF Support",
-  "description": "เครื่องมือจัดการเอกสาร PDF ครบวงจร ประมวลผลบนเครื่อง ปลอดภัย 100% ออฟไลน์ก็ใช้งานได้",
+  "name": "Mirai PDF Studio",
+  "short_name": "Mirai PDF",
+  "description": "เครื่องมือจัดการเอกสาร PDF ความปลอดภัยสูง ประมวลผลในเครื่อง 100% ใช้งานออฟไลน์ได้สมบูรณ์แบบ",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#db2777",
+  "theme_color": "#0f172a",
   "icons": [
     {
       "src": "/icons/icon-192.png",
