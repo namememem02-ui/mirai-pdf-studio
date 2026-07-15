@@ -5,9 +5,11 @@ import { createWorker } from 'tesseract.js';
 import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
-import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
+import { getPdfjs, baseName } from '@/lib/pdf';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 export default function ExtractTextPage() {
+  const { requestBlobDownload } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [text, setText] = useState('');
   const [useOcr, setUseOcr] = useState(false);
@@ -178,7 +180,7 @@ export default function ExtractTextPage() {
                 {copied ? '✅ คัดลอกเรียบร้อย' : '📋 คัดลอกทั้งหมด'}
               </button>
               <button
-                onClick={() => downloadBlob(text, `${baseName(file!.name)}.txt`, 'text/plain;charset=utf-8')}
+                onClick={() => requestBlobDownload(`${baseName(file!.name)}.txt`, new Blob([text], { type: 'text/plain;charset=utf-8' }))}
                 className="px-4 py-2 rounded-lg bg-gray-850 hover:bg-gray-700 text-white text-xs font-bold transition cursor-pointer shadow-sm"
               >
                 💾 บันทึกเป็นไฟล์ .txt

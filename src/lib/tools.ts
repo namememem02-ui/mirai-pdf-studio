@@ -24,10 +24,17 @@ export const TOOLS: ToolInfo[] = [
   },
   {
     id: 'split',
-    name: 'แยกหน้า PDF',
-    description: 'เลือกเฉพาะหน้าที่ต้องการ เช่น 1-3,5 ออกมาเป็นไฟล์ใหม่',
+    name: 'ตัดหน้า PDF',
+    description: 'เลือกหน้าที่ต้องการเก็บไว้ และตัดหน้าที่ไม่ต้องการออกจากไฟล์',
     icon: '✂️',
     color: 'bg-orange-100',
+  },
+  {
+    id: 'split-pages',
+    name: 'แยกหน้า PDF',
+    description: 'แยกทุกหน้าเป็นไฟล์ PDF หน้าเดียว เลือกดาวน์โหลดเดี่ยวหรือรวมเป็น ZIP',
+    icon: '📑',
+    color: 'bg-lime-100',
   },
   {
     id: 'rotate',

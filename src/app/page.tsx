@@ -21,8 +21,8 @@ const CATEGORIES: ToolCategory[] = [
   {
     title: 'จัดเรียงลำดับและหน้าเอกสาร (Page Layout & Margins)',
     icon: '📄',
-    description: 'รวมไฟล์ แยกหน้า ลบ/แทรกจัดลำดับหน้า หมุนกระดาษ หรือแสตมป์รหัสหมายเลขหน้า',
-    ids: ['merge', 'split', 'organize', 'rotate', 'page-number'],
+    description: 'รวมไฟล์ แยกทุกหน้า ตัดหน้าที่ไม่ต้องการ ลบ/แทรกจัดลำดับหน้า หมุนกระดาษ หรือแสตมป์เลขหน้า',
+    ids: ['merge', 'split-pages', 'split', 'organize', 'rotate', 'page-number'],
   },
   {
     title: 'แปลงไฟล์และถอดอักษรภาษาไทย (Convert & OCR)',

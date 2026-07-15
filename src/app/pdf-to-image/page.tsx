@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import JSZip from 'jszip';
 import PageHeader from '@/components/PageHeader';
 import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
-import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
+import { getPdfjs, baseName } from '@/lib/pdf';
+import { createZipBlob } from '@/lib/download';
+import { useDownloadQueue } from '@/context/DownloadQueueContext';
 
 interface PageImage {
   page: number;
@@ -14,6 +15,7 @@ interface PageImage {
 }
 
 export default function PdfToImagePage() {
+  const { requestBlobDownload } = useDownloadQueue();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
@@ -64,12 +66,8 @@ export default function PdfToImagePage() {
 
   const downloadZip = async () => {
     if (!file || images.length === 0) return;
-    const zip = new JSZip();
-    for (const im of images) {
-      zip.file(`${baseName(file.name)}_page${im.page}.png`, im.blob);
-    }
-    const blob = await zip.generateAsync({ type: 'blob' });
-    downloadBlob(blob, `${baseName(file.name)}_images.zip`, 'application/zip');
+    const blob = await createZipBlob(images.map((im) => ({ filename: `${baseName(file.name)}_page${im.page}.png`, blob: im.blob })));
+    requestBlobDownload(`${baseName(file.name)}_images.zip`, blob);
   };
 
   return (
@@ -103,17 +101,16 @@ export default function PdfToImagePage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {images.map((im) => (
-                <a
+                <button
                   key={im.page}
-                  href={im.url}
-                  download={`${baseName(file!.name)}_page${im.page}.png`}
+                  onClick={() => requestBlobDownload(`${baseName(file!.name)}_page${im.page}.png`, im.blob)}
                   className="bg-white border border-gray-200 rounded-lg p-2 hover:shadow-md transition text-center"
                   title="คลิกเพื่อดาวน์โหลดหน้านี้"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={im.url} alt={`หน้า ${im.page}`} className="w-full rounded border border-gray-100" />
                   <span className="text-xs text-gray-500 mt-1 block">หน้า {im.page} ⬇</span>
-                </a>
+                </button>
               ))}
             </div>
           </div>

@@ -126,7 +126,7 @@ export default function SplitPage() {
     setResultItemId(null);
     try {
       if (selectedPages.length === 0) {
-        setError('กรุณาเลือกอย่างน้อย 1 หน้าเพื่อทำการแยก');
+        setError('กรุณาเลือกอย่างน้อย 1 หน้าที่ต้องการเก็บไว้');
         return;
       }
       const src = await PDFDocument.load(await file.arrayBuffer(), { ignoreEncryption: true });
@@ -140,7 +140,7 @@ export default function SplitPage() {
       setResultItemId(id);
       setDone(true);
     } catch (e) {
-      setError('แยกหน้าไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ'));
+      setError('ตัดหน้าไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไม่ทราบสาเหตุ'));
     } finally {
       setBusy(false);
     }
@@ -148,7 +148,7 @@ export default function SplitPage() {
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-8">
-      <PageHeader icon="✂️" title="แยกหน้า PDF" description="เลือกเฉพาะหน้าที่ต้องการโดยการคลิกที่รูปภาพพรีวิว หรือระบุช่วงหน้าเอง" />
+      <PageHeader icon="✂️" title="ตัดหน้า PDF" description="เลือกหน้าที่ต้องการเก็บไว้ หน้าที่ไม่เลือกจะถูกตัดออกจากไฟล์ผลลัพธ์" />
 
       <div className="space-y-6">
         <FileDropzone
@@ -171,7 +171,7 @@ export default function SplitPage() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
               <div className="flex-1 max-w-md">
                 <label className="block text-xs font-bold text-gray-500 mb-1 uppercase tracking-wide">
-                  ระบุหน้าที่จะดึงออกมา:
+                  ระบุหน้าที่ต้องการเก็บไว้:
                 </label>
                 <input
                   type="text"
@@ -243,7 +243,7 @@ export default function SplitPage() {
         {done && resultItemId && (
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-6 text-center space-y-4 shadow-sm">
             <span className="text-4xl block">🎉</span>
-            <h3 className="font-bold text-emerald-800 text-sm">แยกหน้า PDF เสร็จเรียบร้อยแล้ว!</h3>
+            <h3 className="font-bold text-emerald-800 text-sm">ตัดหน้า PDF เสร็จเรียบร้อยแล้ว!</h3>
             <p className="text-xs text-emerald-600">ตรวจสอบความถูกต้องผ่านพรีวิวก่อนเปิดดาวน์โหลดลงเครื่องได้ทันที</p>
             
             <div className="flex justify-center gap-3">
@@ -267,7 +267,7 @@ export default function SplitPage() {
         )}
 
         <ActionButton onClick={splitPdf} disabled={!file || selectedPages.length === 0 || busy} busy={busy}>
-          ✂️ เริ่มแยกหน้าที่เลือก ({selectedPages.length} หน้า)
+          ✂️ ตัดหน้าที่ไม่เลือกออก (เก็บ {selectedPages.length} หน้า)
         </ActionButton>
       </div>
 
