@@ -27,8 +27,8 @@ const CATEGORIES: ToolCategory[] = [
   {
     title: 'แปลงไฟล์และถอดอักษรภาษาไทย (Convert & OCR)',
     icon: '🔄',
-    description: 'แปลงรูปภาพเป็น PDF, แปลงหน้า PDF เป็นไฟล์รูปภาพ, บีบอัดขนาดไฟล์, แปลง Excel เป็น PDF หรือถอดตัวอักษรภาพสแกน OCR',
-    ids: ['image-to-pdf', 'pdf-to-image', 'extract-text', 'compress', 'excel-to-pdf'],
+    description: 'แปลงรูปภาพเป็น PDF, แปลงหน้า PDF เป็นไฟล์รูปภาพ, บีบอัดขนาดไฟล์, แปลง Excel เป็น PDF, แปลง PDF เป็น Excel หรือถอดตัวอักษรภาพสแกน OCR',
+    ids: ['image-to-pdf', 'pdf-to-image', 'extract-text', 'compress', 'excel-to-pdf', 'pdf-to-excel'],
   },
 ];
 
