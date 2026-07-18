@@ -1,31 +1,26 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import MeeARaiBrand from './MeeARaiBrand';
 
 export default function HeaderNav() {
   const { queue } = useDownloadQueue();
-
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
   useEffect(() => {
-    const handleBeforeInstallPrompt = (e: any) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
+    const handleBeforeInstallPrompt = (event: any) => {
+      event.preventDefault();
+      setDeferredPrompt(event);
       setIsInstallable(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    if (window.matchMedia('(display-mode: standalone)').matches) setIsInstallable(false);
 
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-      setIsInstallable(false);
-    }
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
+    return () => window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
   }, []);
 
   const handleInstallClick = async () => {
@@ -39,41 +34,26 @@ export default function HeaderNav() {
   };
 
   return (
-    <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-10 shadow-sm text-white">
-      <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2.5 font-extrabold text-lg tracking-tight hover:opacity-95 transition">
-            <span className="text-xl">⚙️</span>
-            <span>Mirai PDF Studio</span>
-          </Link>
-          
-          {/* Downloads Queue Link with Badge */}
-          <Link
-            href="/downloads"
-            className="flex items-center gap-1.5 bg-slate-800 hover:bg-slate-750 text-xs font-bold px-2.5 py-1.5 rounded-lg text-slate-200 border border-slate-700/80 transition"
-          >
-            📥 คิวไฟล์เอกสาร
+    <header className="mee-pdf-header sticky top-0 z-10">
+      <div className="max-w-5xl mx-auto flex items-center justify-between gap-2 px-3 py-2.5 sm:px-4">
+        <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+          <MeeARaiBrand appName="PDF Studio" accentColor="#22d3ee" />
+          <Link href="/" className="mee-pdf-home-link" aria-label="Home">Home</Link>
+          <Link href="/downloads" className="mee-pdf-header-control flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition">
+            <span aria-hidden="true">📥</span><span className="hidden sm:inline">คิวไฟล์เอกสาร</span><span className="sm:hidden">คิว</span>
             {queue.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-pink-500 text-white text-[9px] font-bold flex items-center justify-center animate-pulse">
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-white animate-pulse">
                 {queue.length}
               </span>
             )}
           </Link>
-
-          {/* Quick PWA Install Button */}
           {isInstallable && (
-            <button
-              onClick={handleInstallClick}
-              className="flex items-center gap-1 bg-pink-600 hover:bg-pink-700 text-xs font-bold px-2.5 py-1.5 rounded-lg text-white border border-pink-500 transition shadow-sm animate-pulse cursor-pointer"
-            >
-              📲 ติดตั้งแอป
+            <button onClick={handleInstallClick} className="mee-pdf-install-control flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold shadow-sm transition animate-pulse cursor-pointer">
+              📲 <span className="hidden sm:inline">ติดตั้งแอป</span><span className="sm:hidden">ติดตั้ง</span>
             </button>
           )}
         </div>
-
-        <span className="text-xs text-slate-400 hidden sm:flex items-center gap-1.5 font-semibold">
-          🔒 Secure Client-Side Engine
-        </span>
+        <span className="hidden shrink-0 items-center gap-1.5 text-xs font-semibold text-slate-500 md:flex">🔒 Client-side PDF tools</span>
       </div>
     </header>
   );

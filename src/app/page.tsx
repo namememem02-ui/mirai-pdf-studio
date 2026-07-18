@@ -87,7 +87,7 @@ export default function Home() {
             ✨ Professional Web Application
           </span>
           <h1 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
-            Mirai PDF Studio
+            Mee-a-rai PDF Studio
           </h1>
           <p className="text-xs text-slate-500 max-w-xl mx-auto leading-relaxed">
             สตูดิโอจัดการเอกสาร PDF ความปลอดภัยสูง ประมวลผลและเข้ารหัสเสร็จสรรพในเครื่องคอมพิวเตอร์ของคุณ 100% โดยไม่ต้องอัปโหลดขึ้นเซิร์ฟเวอร์
@@ -132,7 +132,7 @@ export default function Home() {
           <div className="max-w-xl mx-auto bg-slate-900 text-white border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn text-left">
             <div className="space-y-1">
               <span className="text-[10px] font-bold text-pink-400 uppercase tracking-widest block">⭐ แนะนำการติดตั้ง</span>
-              <h3 className="text-sm font-bold">ติดตั้งโปรแกรม Mirai PDF Studio ลงเครื่อง</h3>
+              <h3 className="text-sm font-bold">ติดตั้งโปรแกรม Mee-a-rai PDF Studio ลงเครื่อง</h3>
               <p className="text-[10px] text-slate-400 leading-normal">
                 เพื่อเรียกใช้งานด่วนผ่านไอคอนหน้าจอเดสก์ท็อป/โทรศัพท์มือถือ และรันเอกสารแบบออฟไลน์ไร้เน็ตได้สมบูรณ์แบบ
               </p>

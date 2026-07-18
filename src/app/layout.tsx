@@ -4,7 +4,7 @@ import { DownloadQueueProvider } from "@/context/DownloadQueueContext";
 import HeaderNav from "@/components/HeaderNav";
 
 export const metadata: Metadata = {
-  title: "Mirai PDF Studio — เครื่องมือจัดการเอกสาร PDF ความปลอดภัยสูง",
+  title: "Mee-a-rai PDF Studio — เครื่องมือจัดการเอกสาร PDF ความปลอดภัยสูง",
   description:
     "เขียนและลบข้อความ เซ็นลายเซ็น บีบอัด ใส่รหัสผ่าน และจัดการหน้า PDF ในเครื่อง 100% ปลอดภัย ไม่ผ่านคลาวด์ ออฟไลน์สมบูรณ์แบบ",
   manifest: "/manifest.json",
@@ -23,7 +23,7 @@ export default function RootLayout({
 
           <footer className="border-t border-gray-200 bg-white">
             <div className="max-w-5xl mx-auto px-4 py-4 text-center text-xs text-gray-400 font-semibold">
-              🔒 Mirai PDF Studio — ข้อมูลของคุณปลอดภัย ประมวลผลและเข้ารหัสในเครื่องคุณ 100% โดยไม่ผ่านคลาวด์เซิร์ฟเวอร์
+              🔒 Mee-a-rai PDF Studio — ข้อมูลของคุณปลอดภัย ประมวลผลและเข้ารหัสในเครื่องคุณ 100% โดยไม่ผ่านคลาวด์เซิร์ฟเวอร์
             </div>
           </footer>
         </DownloadQueueProvider>

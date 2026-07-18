@@ -5,3 +5,20 @@ body {
   color: #1f2937;
   font-family: "Noto Sans Thai", "Segoe UI", system-ui, sans-serif;
 }
+
+.mee-pdf-header { background: rgba(255, 255, 255, .96); border-bottom: 1px solid #dbeafe; box-shadow: 0 1px 12px rgba(14, 116, 144, .08); color: #0f172a; }
+.mee-arai-brand { display: flex; min-width: 0; flex: 1 1 auto; align-items: center; gap: .35rem; color: #0f172a; font-size: .95rem; font-weight: 800; letter-spacing: -.025em; line-height: 1; }
+.mee-arai-brand__trigger { display: inline-flex; width: var(--mee-arai-idle-width); height: 35px; flex: 0 0 var(--mee-arai-idle-width); align-items: center; justify-content: center; overflow: hidden; border: 0; border-left: 3px solid var(--mee-arai-accent); border-radius: 0; background: transparent; color: #0369a1; cursor: pointer; transition: width 180ms ease, flex-basis 180ms ease, color 180ms ease; }
+.mee-arai-brand__trigger:hover, .mee-arai-brand--expanded .mee-arai-brand__trigger { color: #0e7490; }
+.mee-arai-brand--expanded .mee-arai-brand__trigger { width: var(--mee-arai-expanded-width); flex-basis: var(--mee-arai-expanded-width); justify-content: flex-start; padding-left: .55rem; }
+.mee-arai-brand__trigger:focus-visible { outline: 3px solid color-mix(in srgb, var(--mee-arai-accent) 55%, white); outline-offset: 3px; }
+.mee-arai-brand__separator { flex: 0 0 auto; color: #67e8f9; font-weight: 500; }
+.mee-arai-brand__app-name { min-width: 2.5rem; flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #334155; font-size: .875rem; font-weight: 700; }
+.mee-pdf-home-link { flex: 0 0 auto; color: #475569; font-size: .75rem; font-weight: 700; transition: color 160ms ease; }
+.mee-pdf-home-link:hover, .mee-pdf-home-link:focus-visible { color: #0284c7; }
+.mee-pdf-header-control { border: 1px solid #bae6fd; background: #f0f9ff; color: #0c4a6e; }
+.mee-pdf-header-control:hover, .mee-pdf-header-control:focus-visible { border-color: #38bdf8; background: #e0f2fe; }
+.mee-pdf-install-control { border: 1px solid #0891b2; background: #0891b2; color: white; }
+.mee-pdf-install-control:hover, .mee-pdf-install-control:focus-visible { background: #0e7490; }
+@media (max-width: 480px) { .mee-arai-brand--expanded .mee-arai-brand__trigger { width: min(96px, var(--mee-arai-expanded-width)); flex-basis: min(96px, var(--mee-arai-expanded-width)); } }
+@media (prefers-reduced-motion: reduce) { .mee-arai-brand__trigger, .mee-pdf-home-link { transition: none; } }
