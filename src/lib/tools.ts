@@ -113,4 +113,11 @@ export const TOOLS: ToolInfo[] = [
     icon: '📊',
     color: 'bg-emerald-50',
   },
+  {
+    id: 'pdf-to-excel',
+    name: 'แปลง PDF เป็น Excel',
+    description: 'ถอดข้อมูลตารางจาก PDF ออกมาเป็นแผ่นงาน Excel (.xlsx) จัดระเบียบช่องข้อมูลให้อัตโนมัติ',
+    icon: '📊',
+    color: 'bg-emerald-100',
+  },
 ];
