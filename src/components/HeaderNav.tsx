@@ -40,16 +40,16 @@ export default function HeaderNav() {
           <MeeARaiBrand appName="PDF Studio" accentColor="#22d3ee" />
           <Link href="/" className="mee-pdf-home-link" aria-label="Home">Home</Link>
           <Link href="/downloads" className="mee-pdf-header-control flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-bold transition">
-            <span aria-hidden="true">📥</span><span className="hidden sm:inline">คิวไฟล์เอกสาร</span><span className="sm:hidden">คิว</span>
+            <span className="mee-pdf-queue-icon" aria-hidden="true">📥</span><span className="mee-pdf-queue-label hidden sm:inline">คิวไฟล์เอกสาร</span><span className="mee-pdf-queue-label sm:hidden">คิว</span>
             {queue.length > 0 && (
-              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-white animate-pulse">
+              <span className="mee-pdf-queue-badge flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-[9px] font-bold text-white animate-pulse">
                 {queue.length}
               </span>
             )}
           </Link>
           {isInstallable && (
             <button onClick={handleInstallClick} className="mee-pdf-install-control flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-bold shadow-sm transition animate-pulse cursor-pointer">
-              📲 <span className="hidden sm:inline">ติดตั้งแอป</span><span className="sm:hidden">ติดตั้ง</span>
+              📲 <span className="mee-pdf-install-label hidden sm:inline">ติดตั้งแอป</span><span className="mee-pdf-install-label sm:hidden">ติดตั้ง</span>
             </button>
           )}
         </div>

@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import React from 'react';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import MeeARaiBrand from './MeeARaiBrand';
@@ -54,16 +56,25 @@ describe('MeeARaiBrand', () => {
     expect(brand).toHaveAttribute('data-expanded', 'false');
   });
 
-  it('keeps the first touch tap open through its pointerleave and closes on the second tap', () => {
+  it('keeps the first full touch sequence open and closes on the second even after touch-induced focus', async () => {
     renderBrand();
     const brand = screen.getByTestId('mee-arai-brand');
     const trigger = screen.getByRole('button', { name: /mee-a-rai brand/i });
 
+    fireEvent.pointerEnter(trigger, { pointerType: 'touch' });
     fireEvent.pointerDown(trigger, { pointerType: 'touch' });
+    await Promise.resolve();
+    fireEvent.click(trigger);
+    fireEvent.focus(trigger);
     fireEvent.pointerLeave(trigger, { pointerType: 'touch' });
     expect(brand).toHaveAttribute('data-expanded', 'true');
 
+    fireEvent.pointerEnter(trigger, { pointerType: 'touch' });
     fireEvent.pointerDown(trigger, { pointerType: 'touch' });
+    await Promise.resolve();
+    fireEvent.click(trigger);
+    fireEvent.focus(trigger);
+    fireEvent.pointerLeave(trigger, { pointerType: 'touch' });
     expect(brand).toHaveAttribute('data-expanded', 'false');
   });
 
@@ -88,5 +99,12 @@ describe('MeeARaiBrand', () => {
 
     expect(screen.getAllByText('Mee-a-rai')).toHaveLength(1);
     expect(screen.getByTestId('mee-arai-brand')).toHaveTextContent(/^Mee-a-rai\s*\|\s*PDF Studio$/);
+  });
+
+  it('keeps the expanded trigger at 166px without a mobile width exception', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+
+    expect(css).toContain('.mee-arai-brand--expanded .mee-arai-brand__trigger { width: var(--mee-arai-expanded-width);');
+    expect(css).not.toContain('96px');
   });
 });

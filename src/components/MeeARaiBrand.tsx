@@ -15,7 +15,7 @@ export default function MeeARaiBrand({
 }: MeeARaiBrandProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const brandRef = useRef<HTMLDivElement>(null);
-  const skipFocusExpansion = useRef(false);
+  const lastPointerType = useRef<string | null>(null);
 
   useEffect(() => {
     const closeOnOutsidePointer = (event: PointerEvent) => {
@@ -61,17 +61,17 @@ export default function MeeARaiBrand({
           if (isHoverPointer(event)) setIsExpanded(false);
         }}
         onPointerDown={(event) => {
-          if (pointerType(event) !== 'touch') return;
-          skipFocusExpansion.current = true;
+          lastPointerType.current = pointerType(event);
+          if (lastPointerType.current !== 'touch') return;
           setIsExpanded((expanded) => !expanded);
-          queueMicrotask(() => {
-            skipFocusExpansion.current = false;
-          });
         }}
         onFocus={() => {
-          if (!skipFocusExpansion.current) setIsExpanded(true);
+          if (lastPointerType.current !== 'touch') setIsExpanded(true);
         }}
-        onBlur={() => setIsExpanded(false)}
+        onBlur={() => {
+          lastPointerType.current = null;
+          setIsExpanded(false);
+        }}
         onKeyDown={(event) => {
           if (event.key === 'Escape') {
             setIsExpanded(false);

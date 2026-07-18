@@ -72,3 +72,42 @@ Result: Next.js 16.2.10 production build completed successfully. TypeScript pass
 ## Concern
 
 Automated coverage and the production build pass. A manual browser viewport pass could not be completed in this worktree because the reserved local port 4200 was already serving a different worktree and the sandbox did not retain a secondary background dev server. The narrow-width behavior is covered by the responsive CSS contract and interaction tests, but should receive one visual pass when this branch is launched on its own 4200 instance.
+
+## Review follow-up — width and touch regression fix
+
+### Root cause
+
+- The `max-width: 480px` rule overrode the expanded trigger width to `96px`, violating the 166px wordmark contract.
+- The initial touch guard used `queueMicrotask` to clear a focus-suppression flag. A realistic event sequence can run focus after that microtask, reopening the brand after the second touch tap.
+
+### Regression RED
+
+Focused command:
+
+```text
+npm.cmd exec vitest run src/components/MeeARaiBrand.test.tsx
+```
+
+Result before the fix: 2 failures out of 6 tests. The realistic second touch sequence (`pointerenter`, `pointerdown`, microtask boundary, `click`, `focus`, `pointerleave`) ended expanded instead of closed, and the CSS contract found the `96px` mobile exception.
+
+### Fix and GREEN
+
+- Replaced the time-based focus guard with a `lastPointerType` interaction record, reset on blur; touch-induced focus is ignored until focus leaves the trigger.
+- Removed the trigger-width media override. At 480px and below, Home and text labels are hidden and queue/install controls become icon-only; the queue badge is positioned over its compact button. The 166px expanded trigger remains unchanged at every viewport.
+- Added a CSS source contract test requiring the canonical expanded-width declaration and rejecting any `96px` exception.
+
+Focused result: `MeeARaiBrand.test.tsx` passed 6/6 tests.
+
+Full verification rerun:
+
+```text
+npm.cmd exec vitest run
+```
+
+Result: 6 files passed, 18 tests passed.
+
+```text
+npm.cmd run build
+```
+
+Result: Next.js 16.2.10 production build compiled successfully, TypeScript passed, and all 21 static routes generated.
