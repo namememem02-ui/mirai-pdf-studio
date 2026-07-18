@@ -9,6 +9,44 @@ import MeeARaiBrand from './MeeARaiBrand';
 import HeaderNav from './HeaderNav';
 import { DownloadQueueProvider } from '@/context/DownloadQueueContext';
 
+const expandedTriggerSelector = '.mee-arai-brand--expanded .mee-arai-brand__trigger';
+const expandedWidth = 'var(--mee-arai-expanded-width)';
+
+function mediaBlocks(css: string) {
+  const blocks: string[] = [];
+  let cursor = 0;
+
+  while (true) {
+    const mediaStart = css.indexOf('@media', cursor);
+    if (mediaStart === -1) return blocks;
+
+    const openingBrace = css.indexOf('{', mediaStart);
+    let depth = 1;
+    let index = openingBrace + 1;
+
+    while (index < css.length && depth > 0) {
+      if (css[index] === '{') depth += 1;
+      if (css[index] === '}') depth -= 1;
+      index += 1;
+    }
+
+    blocks.push(css.slice(openingBrace + 1, index - 1));
+    cursor = index;
+  }
+}
+
+function invalidExpandedTriggerMediaOverrides(css: string) {
+  return mediaBlocks(css).flatMap((block) =>
+    [...block.matchAll(/([^{}]+)\{([^{}]*)\}/g)].flatMap(([, selectors, declarations]) => {
+      if (!selectors.includes(expandedTriggerSelector)) return [];
+
+      return [...declarations.matchAll(/\b(width|flex-basis)\s*:\s*([^;]+);?/g)]
+        .filter(([, , value]) => value.trim() !== expandedWidth)
+        .map(([, property, value]) => `${property}: ${value.trim()}`);
+    }),
+  );
+}
+
 describe('MeeARaiBrand', () => {
   afterEach(() => {
     cleanup();
@@ -101,10 +139,12 @@ describe('MeeARaiBrand', () => {
     expect(screen.getByTestId('mee-arai-brand')).toHaveTextContent(/^Mee-a-rai\s*\|\s*PDF Studio$/);
   });
 
-  it('keeps the expanded trigger at 166px without a mobile width exception', () => {
+  it('allows no media-query override of the expanded 166px trigger contract', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8');
+    const alternateMobileWidth = `${css}\n@media (max-width: 480px) { ${expandedTriggerSelector} { width: 120px; flex-basis: 120px; } }`;
 
     expect(css).toContain('.mee-arai-brand--expanded .mee-arai-brand__trigger { width: var(--mee-arai-expanded-width);');
-    expect(css).not.toContain('96px');
+    expect(invalidExpandedTriggerMediaOverrides(css)).toEqual([]);
+    expect(invalidExpandedTriggerMediaOverrides(alternateMobileWidth)).toEqual(['width: 120px', 'flex-basis: 120px']);
   });
 });
