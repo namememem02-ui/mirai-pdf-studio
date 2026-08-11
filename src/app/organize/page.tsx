@@ -37,6 +37,7 @@ export default function OrganizePage() {
   // Drag and drop & zoom lightbox states
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [zoomedItem, setZoomedItem] = useState<OrganizePageItem | null>(null);
+  const [dragOverGrid, setDragOverGrid] = useState(false);
 
   const insertPdfInputRef = useRef<HTMLInputElement>(null);
   const insertImageInputRef = useRef<HTMLInputElement>(null);
@@ -50,49 +51,54 @@ export default function OrganizePage() {
     };
   }, [items]);
 
+  const getPdfPageItems = async (f: File, fileId: string): Promise<OrganizePageItem[]> => {
+    const buffer = await f.arrayBuffer();
+    
+    setLoadedBuffers((prev) => ({
+      ...prev,
+      [fileId]: buffer,
+    }));
+
+    const pdfjs = await getPdfjs();
+    const doc = await pdfjs.getDocument({
+      cMapUrl: '/cmaps/',
+      cMapPacked: true,
+      data: buffer.slice(0)
+    }).promise;
+    const count = doc.numPages;
+
+    const newItems: OrganizePageItem[] = [];
+    for (let i = 0; i < count; i++) {
+      setProgress(`กำลังอ่านประมวลผลหน้าพรีวิว ${i + 1} จากทั้งหมด ${count} ของไฟล์ ${f.name}...`);
+      const page = await doc.getPage(i + 1);
+      const viewport = page.getViewport({ scale: 0.8 }); // Higher scale for sharp zoom viewing
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      newItems.push({
+        id: `page-${fileId}-${i}-${Math.random()}`,
+        type: 'pdf',
+        fileId,
+        fileName: f.name,
+        originalIndex: i,
+        thumbnail: canvas.toDataURL('image/png'),
+        rotation: 0,
+      });
+    }
+    return newItems;
+  };
+
   const loadPdfPages = async (f: File, isPrimary: boolean) => {
     try {
-      const buffer = await f.arrayBuffer();
       const fileId = `pdf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      
-      setLoadedBuffers((prev) => ({
-        ...prev,
-        [fileId]: buffer,
-      }));
-
-      const pdfjs = await getPdfjs();
-      const doc = await pdfjs.getDocument({
-        cMapUrl: '/cmaps/',
-        cMapPacked: true,
-        data: buffer.slice(0)
-      }).promise;
-      const count = doc.numPages;
-
-      const newItems: OrganizePageItem[] = [];
-      for (let i = 0; i < count; i++) {
-        setProgress(`กำลังอ่านประมวลผลหน้าพรีวิว ${i + 1} จากทั้งหมด ${count} ของไฟล์ ${f.name}...`);
-        const page = await doc.getPage(i + 1);
-        const viewport = page.getViewport({ scale: 0.8 }); // Higher scale for sharp zoom viewing
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d')!;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-
-        newItems.push({
-          id: `page-${fileId}-${i}-${Math.random()}`,
-          type: 'pdf',
-          fileId,
-          fileName: f.name,
-          originalIndex: i,
-          thumbnail: canvas.toDataURL('image/png'),
-          rotation: 0,
-        });
-      }
+      const newItems = await getPdfPageItems(f, fileId);
 
       if (isPrimary) {
         setFile(f);
-        setPageCount(count);
+        setPageCount(newItems.length);
         setItems(newItems);
       } else {
         setItems((prev) => [...prev, ...newItems]);
@@ -103,19 +109,131 @@ export default function OrganizePage() {
     }
   };
 
-  const pickPrimary = async (files: File[]) => {
-    const f = files[0];
-    if (!f.name.toLowerCase().endsWith('.pdf')) {
-      setError('กรุณาเลือกไฟล์ PDF หลัก');
+  const handleFiles = async (files: File[], isDrop?: boolean) => {
+    if (files.length === 0) return;
+
+    // Filter files
+    const pdfFiles = files.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+    const imageFiles = files.filter(f => {
+      const ext = f.name.toLowerCase();
+      return ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg');
+    });
+
+    if (pdfFiles.length === 0 && imageFiles.length === 0) {
+      setError('กรุณาเลือกไฟล์ PDF หรือรูปภาพที่ต้องการ');
       return;
     }
+
     setBusy(true);
     setDone(false);
-    setItems([]);
-    setLoadedBuffers({});
-    await loadPdfPages(f, true);
-    setBusy(false);
-    setProgress('');
+    setError(null);
+
+    try {
+      // Scenario 1: Appending files (dropping files when we already have items loaded)
+      if (items.length > 0 && isDrop) {
+        const addedItems: OrganizePageItem[] = [];
+        
+        for (const f of files) {
+          const ext = f.name.toLowerCase();
+          if (ext.endsWith('.pdf')) {
+            const fileId = `pdf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+            const pdfItems = await getPdfPageItems(f, fileId);
+            addedItems.push(...pdfItems);
+          } else if (ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg')) {
+            addedItems.push({
+              id: `img-${Date.now()}-${Math.random()}`,
+              type: 'image',
+              fileName: f.name,
+              imageFile: f,
+              imageUrl: URL.createObjectURL(f),
+              rotation: 0,
+            });
+          }
+        }
+        
+        setItems((prev) => [...prev, ...addedItems]);
+        setBusy(false);
+        setProgress('');
+        return;
+      }
+
+      // Scenario 2: Starting fresh (no items loaded yet, or it's a click to change primary file)
+      // If it's a click/selection on the dropzone, we reset first
+      if (!isDrop) {
+        // Revoke old image URLs to prevent memory leaks
+        items.forEach((item) => {
+          if (item.imageUrl) URL.revokeObjectURL(item.imageUrl);
+        });
+        setItems([]);
+        setLoadedBuffers({});
+        setFile(null);
+      }
+
+      const initialItems: OrganizePageItem[] = [];
+      let primaryPdfSet = false;
+
+      // Handle files in order
+      for (const f of files) {
+        const ext = f.name.toLowerCase();
+        if (ext.endsWith('.pdf')) {
+          const fileId = `pdf-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+          const pdfItems = await getPdfPageItems(f, fileId);
+          initialItems.push(...pdfItems);
+          
+          if (!primaryPdfSet && !isDrop) {
+            setFile(f);
+            setPageCount(pdfItems.length);
+            primaryPdfSet = true;
+          }
+        } else if (ext.endsWith('.png') || ext.endsWith('.jpg') || ext.endsWith('.jpeg')) {
+          initialItems.push({
+            id: `img-${Date.now()}-${Math.random()}`,
+            type: 'image',
+            fileName: f.name,
+            imageFile: f,
+            imageUrl: URL.createObjectURL(f),
+            rotation: 0,
+          });
+        }
+      }
+
+      if (isDrop) {
+        // If starting via drop, make the first PDF the primary file if we have one
+        const firstPdf = pdfFiles[0];
+        if (firstPdf) {
+          setFile(firstPdf);
+        }
+      }
+
+      setItems(initialItems);
+    } catch (err) {
+      setError('เกิดข้อผิดพลาดในการโหลดไฟล์');
+    } finally {
+      setBusy(false);
+      setProgress('');
+    }
+  };
+
+  const handleGridDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(true);
+    }
+  };
+
+  const handleGridDragLeave = () => {
+    setDragOverGrid(false);
+  };
+
+  const handleGridDrop = async (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(false);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        await handleFiles(files, true);
+      }
+    }
   };
 
   // Insert Pages from another PDF
@@ -277,9 +395,10 @@ export default function OrganizePage() {
 
       <div className="space-y-6">
         <FileDropzone
-          accept="application/pdf,.pdf"
-          label={file ? `📄 ${file.name} — คลิกเพื่อเปลี่ยนไฟล์หลัก` : 'ลากไฟล์ PDF หลักมาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์เริ่มต้น'}
-          onFiles={pickPrimary}
+          accept="application/pdf,.pdf,image/png,image/jpeg,image/jpg"
+          multiple={true}
+          label={file ? `📄 ${file.name} — คลิกเพื่อเปลี่ยนไฟล์หลัก` : 'ลากไฟล์ PDF หรือรูปภาพหลักมาวางที่นี่ หรือคลิกเพื่อเลือกไฟล์เริ่มต้น'}
+          onFiles={handleFiles}
         />
 
         {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
@@ -307,7 +426,24 @@ export default function OrganizePage() {
         />
 
         {items.length > 0 && (
-          <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-6 shadow-sm">
+          <div
+            onDragOver={handleGridDragOver}
+            onDragLeave={handleGridDragLeave}
+            onDrop={handleGridDrop}
+            className={`bg-white rounded-xl border p-6 space-y-6 shadow-sm transition relative overflow-hidden ${
+              dragOverGrid ? 'border-indigo-400 bg-indigo-50/50 scale-[1.01]' : 'border-gray-200'
+            }`}
+          >
+            {/* Drag Overlay for files */}
+            {dragOverGrid && (
+              <div className="absolute inset-0 bg-indigo-600/10 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none z-30 border-2 border-dashed border-indigo-500 rounded-xl animate-fadeIn">
+                <div className="bg-white px-6 py-4 rounded-xl shadow-lg border border-indigo-100 flex flex-col items-center gap-2">
+                  <span className="text-3xl animate-bounce">📥</span>
+                  <span className="text-xs font-bold text-indigo-900">วางไฟล์ที่นี่เพื่อเพิ่มหน้าใหม่</span>
+                  <span className="text-[10px] text-gray-500">รองรับ PDF และไฟล์รูปภาพ (JPG, PNG)</span>
+                </div>
+              </div>
+            )}
             {/* Toolbar section */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 pb-4">
               <span className="text-sm font-bold text-gray-700">แทรกหน้าเนื้อหาเพิ่มเติม:</span>

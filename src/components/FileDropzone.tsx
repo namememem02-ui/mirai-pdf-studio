@@ -13,14 +13,14 @@ export default function FileDropzone({
   multiple?: boolean;
   label: string;
   hint?: string;
-  onFiles: (files: File[]) => void;
+  onFiles: (files: File[], isDrop: boolean) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
 
-  const handle = (list: FileList | null) => {
+  const handle = (list: FileList | null, isDrop: boolean) => {
     if (!list || list.length === 0) return;
-    onFiles(Array.from(list));
+    onFiles(Array.from(list), isDrop);
   };
 
   return (
@@ -28,7 +28,7 @@ export default function FileDropzone({
       onClick={() => inputRef.current?.click()}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={(e) => { e.preventDefault(); setDragOver(false); handle(e.dataTransfer.files); }}
+      onDrop={(e) => { e.preventDefault(); setDragOver(false); handle(e.dataTransfer.files, true); }}
       className={`bg-white border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition ${
         dragOver ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-blue-300'
       }`}
@@ -39,7 +39,7 @@ export default function FileDropzone({
         accept={accept}
         multiple={multiple}
         className="hidden"
-        onChange={(e) => { handle(e.target.files); e.target.value = ''; }}
+        onChange={(e) => { handle(e.target.files, false); e.target.value = ''; }}
       />
       <div className="text-4xl mb-2">📥</div>
       <p className="font-semibold text-gray-700">{label}</p>
