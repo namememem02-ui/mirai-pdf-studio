@@ -23,6 +23,29 @@ export default function MergePage() {
   const [done, setDone] = useState(false);
   const [resultItemId, setResultItemId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
+  const [dragOverGrid, setDragOverGrid] = useState(false);
+
+  const handleGridDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(true);
+    }
+  };
+
+  const handleGridDragLeave = () => {
+    setDragOverGrid(false);
+  };
+
+  const handleGridDrop = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(false);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        addFiles(files);
+      }
+    }
+  };
 
   const addFiles = async (incoming: File[]) => {
     const pdfs = incoming.filter((f) => f.name.toLowerCase().endsWith('.pdf'));
@@ -128,7 +151,24 @@ export default function MergePage() {
         )}
 
         {items.length > 0 && (
-          <div className="space-y-3">
+          <div
+            onDragOver={handleGridDragOver}
+            onDragLeave={handleGridDragLeave}
+            onDrop={handleGridDrop}
+            className={`space-y-3 p-5 rounded-xl border transition relative overflow-hidden ${
+              dragOverGrid ? 'border-indigo-400 bg-indigo-50/50 scale-[1.01]' : 'bg-white border-gray-200'
+            }`}
+          >
+            {/* Drag Overlay for files */}
+            {dragOverGrid && (
+              <div className="absolute inset-0 bg-indigo-600/10 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none z-30 border-2 border-dashed border-indigo-500 rounded-xl animate-fadeIn">
+                <div className="bg-white px-6 py-4 rounded-xl shadow-lg border border-indigo-100 flex flex-col items-center gap-2">
+                  <span className="text-3xl animate-bounce">📥</span>
+                  <span className="text-xs font-bold text-indigo-900">วางไฟล์ที่นี่เพื่อรวมหน้าเพิ่ม</span>
+                  <span className="text-[10px] text-gray-500">รองรับไฟล์เอกสาร PDF เท่านั้น</span>
+                </div>
+              </div>
+            )}
             <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">ลำดับคิวและตัวอย่างไฟล์:</span>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {items.map((item, i) => (

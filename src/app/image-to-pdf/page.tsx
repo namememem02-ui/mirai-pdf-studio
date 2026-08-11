@@ -24,6 +24,29 @@ export default function ImageToPdfPage() {
   const [done, setDone] = useState(false);
   const [resultItemId, setResultItemId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
+  const [dragOverGrid, setDragOverGrid] = useState(false);
+
+  const handleGridDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(true);
+    }
+  };
+
+  const handleGridDragLeave = () => {
+    setDragOverGrid(false);
+  };
+
+  const handleGridDrop = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(false);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        addFiles(files);
+      }
+    }
+  };
 
   // Clean up object URLs on unmount to prevent memory leaks
   useEffect(() => {
@@ -108,7 +131,24 @@ export default function ImageToPdfPage() {
         {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
 
         {items.length > 0 && (
-          <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
+          <div
+            onDragOver={handleGridDragOver}
+            onDragLeave={handleGridDragLeave}
+            onDrop={handleGridDrop}
+            className={`border rounded-xl p-5 space-y-4 shadow-sm transition relative overflow-hidden ${
+              dragOverGrid ? 'border-indigo-400 bg-indigo-50/50 scale-[1.01]' : 'bg-white border-gray-200'
+            }`}
+          >
+            {/* Drag Overlay for files */}
+            {dragOverGrid && (
+              <div className="absolute inset-0 bg-indigo-600/10 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none z-30 border-2 border-dashed border-indigo-500 rounded-xl animate-fadeIn">
+                <div className="bg-white px-6 py-4 rounded-xl shadow-lg border border-indigo-100 flex flex-col items-center gap-2">
+                  <span className="text-3xl animate-bounce">📥</span>
+                  <span className="text-xs font-bold text-indigo-900">วางไฟล์ที่นี่เพื่อรวมรูปภาพเพิ่ม</span>
+                  <span className="text-[10px] text-gray-500">รองรับไฟล์รูปภาพ JPG, PNG เท่านั้น</span>
+                </div>
+              </div>
+            )}
             <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
               จัดคิวลำดับรูปภาพ ({items.length} รูป):
             </span>
