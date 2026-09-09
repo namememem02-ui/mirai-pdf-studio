@@ -26,28 +26,7 @@ export default function ImageToPdfPage() {
   const [resultItemId, setResultItemId] = useState<string | null>(null);
   const [previewItem, setPreviewItem] = useState<DownloadItem | null>(null);
   const [dragOverGrid, setDragOverGrid] = useState(false);
-
-  const handleGridDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('Files')) {
-      e.preventDefault();
-      setDragOverGrid(true);
-    }
-  };
-
-  const handleGridDragLeave = () => {
-    setDragOverGrid(false);
-  };
-
-  const handleGridDrop = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('Files')) {
-      e.preventDefault();
-      setDragOverGrid(false);
-      const files = Array.from(e.dataTransfer.files);
-      if (files.length > 0) {
-        addFiles(files);
-      }
-    }
-  };
+  const [layoutMode, setLayoutMode] = useState<'standard' | 'continuous'>('standard');
 
   // Clean up object URLs on unmount to prevent memory leaks
   useEffect(() => {
@@ -59,18 +38,17 @@ export default function ImageToPdfPage() {
   const addFiles = (incoming: File[]) => {
     const imgs = incoming.filter((f) => OK_TYPES.includes(f.type));
     if (imgs.length < incoming.length) {
-      setError('รองรับเฉพาะ JPG และ PNG — ข้ามไฟล์ประเภทอื่นให้แล้ว');
+      setError('ข้ามไฟล์ที่ไม่ใช่ JPG หรือ PNG ให้แล้ว');
     } else {
       setError(null);
     }
-    setDone(false);
-
-    const newItems = imgs.map((f) => ({
+    const newItems: ImageItem[] = imgs.map((f) => ({
       file: f,
       url: URL.createObjectURL(f),
     }));
-
     setItems((prev) => [...prev, ...newItems]);
+    setDone(false);
+    setResultItemId(null);
   };
 
   const move = (i: number, dir: -1 | 1) => {
@@ -96,15 +74,48 @@ export default function ImageToPdfPage() {
     setResultItemId(null);
     try {
       const doc = await PDFDocument.create();
-      for (const item of items) {
-        const bytes = await item.file.arrayBuffer();
-        const img =
-          item.file.type === 'image/png'
-            ? await doc.embedPng(bytes)
-            : await doc.embedJpg(bytes);
-        const page = doc.addPage([img.width, img.height]);
-        page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+
+      if (layoutMode === 'continuous' && items.length > 1) {
+        // ต่อรูปภาพทั้งหมดเป็น 1 หน้ายาวในแนวตั้ง
+        const embeddedImages = [];
+        for (const item of items) {
+          const bytes = await item.file.arrayBuffer();
+          const img =
+            item.file.type === 'image/png'
+              ? await doc.embedPng(bytes)
+              : await doc.embedJpg(bytes);
+          embeddedImages.push(img);
+        }
+
+        const maxWidth = Math.max(...embeddedImages.map((img) => img.width));
+        let totalHeight = 0;
+        const scaledHeights = embeddedImages.map((img) => {
+          const scale = maxWidth / img.width;
+          const h = Math.round(img.height * scale);
+          totalHeight += h;
+          return h;
+        });
+
+        const page = doc.addPage([maxWidth, totalHeight]);
+        let currentY = totalHeight;
+        embeddedImages.forEach((img, i) => {
+          const h = scaledHeights[i];
+          currentY -= h;
+          page.drawImage(img, { x: 0, y: currentY, width: maxWidth, height: h });
+        });
+      } else {
+        // 1 รูปต่อ 1 หน้ามาตรฐาน
+        for (const item of items) {
+          const bytes = await item.file.arrayBuffer();
+          const img =
+            item.file.type === 'image/png'
+              ? await doc.embedPng(bytes)
+              : await doc.embedJpg(bytes);
+          const page = doc.addPage([img.width, img.height]);
+          page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+        }
       }
+
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const id = addToQueue('images.pdf', blob);
@@ -118,9 +129,31 @@ export default function ImageToPdfPage() {
     }
   };
 
+  const handleGridDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(true);
+    }
+  };
+
+  const handleGridDragLeave = () => {
+    setDragOverGrid(false);
+  };
+
+  const handleGridDrop = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+      setDragOverGrid(false);
+      const files = Array.from(e.dataTransfer.files);
+      if (files.length > 0) {
+        addFiles(files);
+      }
+    }
+  };
+
   return (
     <main className="max-w-4xl mx-auto px-4 py-8">
-      <PageHeader icon="🖼️" title="รูปภาพ → PDF" description="แปลงรูปภาพ JPG / PNG หลายรูปเป็น PDF ไฟล์เดียว (1 รูป = 1 หน้า) พร้อมลากย้ายจัดลำดับหน้าได้อิสระ" />
+      <PageHeader icon="🖼️" title="รูปภาพ → PDF" description="แปลงรูปภาพ JPG / PNG หลายรูปเป็น PDF ไฟล์เดียว (1 รูป = 1 หน้า หรือต่อเป็นหน้าเดียวยาว)" />
 
       <div className="space-y-6">
         <FileDropzone
@@ -133,68 +166,120 @@ export default function ImageToPdfPage() {
         {error && <p className="text-red-500 text-sm font-semibold">{error}</p>}
 
         {items.length > 0 && (
-          <div
-            onDragOver={handleGridDragOver}
-            onDragLeave={handleGridDragLeave}
-            onDrop={handleGridDrop}
-            className={`border rounded-xl p-5 space-y-4 shadow-sm transition relative overflow-hidden ${
-              dragOverGrid ? 'border-indigo-400 bg-indigo-50/50 scale-[1.01]' : 'bg-white border-gray-200'
-            }`}
-          >
-            {/* Drag Overlay for files */}
-            {dragOverGrid && (
-              <div className="absolute inset-0 bg-indigo-600/10 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none z-30 border-2 border-dashed border-indigo-500 rounded-xl animate-fadeIn">
-                <div className="bg-white px-6 py-4 rounded-xl shadow-lg border border-indigo-100 flex flex-col items-center gap-2">
-                  <span className="text-3xl animate-bounce">📥</span>
-                  <span className="text-xs font-bold text-indigo-900">วางไฟล์ที่นี่เพื่อรวมรูปภาพเพิ่ม</span>
-                  <span className="text-[10px] text-gray-500">รองรับไฟล์รูปภาพ JPG, PNG เท่านั้น</span>
-                </div>
-              </div>
-            )}
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-              จัดคิวลำดับรูปภาพ ({items.length} รูป):
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-              {items.map((item, i) => (
-                <div
-                  key={`${item.file.name}-${i}`}
-                  className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between hover:shadow transition relative select-none"
+          <div className="space-y-4">
+            {/* ตัวเลือกรูปแบบหน้า PDF */}
+            <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm space-y-2">
+              <span className="text-xs font-bold text-gray-700 block">📐 รูปแบบการจัดหน้า PDF:</span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <label
+                  className={`border rounded-lg p-3 flex items-start gap-3 cursor-pointer transition ${
+                    layoutMode === 'standard'
+                      ? 'border-blue-500 bg-blue-50/50 text-blue-900 ring-1 ring-blue-500'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                  }`}
                 >
-                  <div className="flex flex-col items-center">
-                    <div className="w-full aspect-[3/4] overflow-hidden flex items-center justify-center bg-white border border-gray-100 rounded-lg">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={item.url} alt={item.file.name} className="max-w-full max-h-full object-contain" />
-                    </div>
-                    <p className="font-semibold text-[10px] text-gray-600 mt-2 text-center line-clamp-1 w-full" title={item.file.name}>
-                      {i + 1}. {item.file.name}
-                    </p>
+                  <input
+                    type="radio"
+                    name="layoutMode"
+                    value="standard"
+                    checked={layoutMode === 'standard'}
+                    onChange={() => setLayoutMode('standard')}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-bold block">📄 1 รูปต่อ 1 หน้า (มาตรฐาน)</span>
+                    <span className="text-[11px] text-gray-500">แต่ละรูปจะอยู่คนละหน้าในไฟล์ PDF</span>
                   </div>
+                </label>
 
-                  <div className="flex items-center justify-center gap-1.5 mt-3 pt-2 border-t border-gray-200">
-                    <button
-                      onClick={() => move(i, -1)}
-                      disabled={i === 0}
-                      className="px-2 py-1 rounded border border-gray-200 bg-white text-[10px] font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      ← ซ้าย
-                    </button>
-                    <button
-                      onClick={() => move(i, 1)}
-                      disabled={i === items.length - 1}
-                      className="px-2 py-1 rounded border border-gray-200 bg-white text-[10px] font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      ขวา →
-                    </button>
-                    <button
-                      onClick={() => remove(i)}
-                      className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-50 text-red-500 border border-red-100 flex items-center justify-center text-xs hover:bg-red-500 hover:text-white transition cursor-pointer active:scale-95"
-                      title="นำออก"
-                    >
-                      ✕
-                    </button>
+                <label
+                  className={`border rounded-lg p-3 flex items-start gap-3 cursor-pointer transition ${
+                    layoutMode === 'continuous'
+                      ? 'border-blue-500 bg-blue-50/50 text-blue-900 ring-1 ring-blue-500'
+                      : 'border-gray-200 hover:border-gray-300 text-gray-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="layoutMode"
+                    value="continuous"
+                    checked={layoutMode === 'continuous'}
+                    onChange={() => setLayoutMode('continuous')}
+                    className="mt-0.5"
+                  />
+                  <div>
+                    <span className="text-xs font-bold block">📜 รวมต่อกันเป็น 1 หน้ายาว</span>
+                    <span className="text-[11px] text-gray-500">ต่อทุกรูปในแนวตั้งเป็น PDF หน้าเดียวขนาดยาว</span>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            <div
+              onDragOver={handleGridDragOver}
+              onDragLeave={handleGridDragLeave}
+              onDrop={handleGridDrop}
+              className={`border rounded-xl p-5 space-y-4 shadow-sm transition relative overflow-hidden ${
+                dragOverGrid ? 'border-indigo-400 bg-indigo-50/50 scale-[1.01]' : 'bg-white border-gray-200'
+              }`}
+            >
+              {/* Drag Overlay for files */}
+              {dragOverGrid && (
+                <div className="absolute inset-0 bg-indigo-600/10 backdrop-blur-[2px] flex flex-col items-center justify-center pointer-events-none z-30 border-2 border-dashed border-indigo-500 rounded-xl animate-fadeIn">
+                  <div className="bg-white px-6 py-4 rounded-xl shadow-lg border border-indigo-100 flex flex-col items-center gap-2">
+                    <span className="text-3xl animate-bounce">📥</span>
+                    <span className="text-xs font-bold text-indigo-900">วางไฟล์ที่นี่เพื่อรวมรูปภาพเพิ่ม</span>
+                    <span className="text-[10px] text-gray-500">รองรับไฟล์รูปภาพ JPG, PNG เท่านั้น</span>
                   </div>
                 </div>
-              ))}
+              )}
+              <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">
+                จัดคิวลำดับรูปภาพ ({items.length} รูป):
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {items.map((item, i) => (
+                  <div
+                    key={`${item.file.name}-${i}`}
+                    className="bg-gray-50 border border-gray-200 rounded-xl p-3 flex flex-col justify-between hover:shadow transition relative select-none"
+                  >
+                    <div className="flex flex-col items-center">
+                      <div className="w-full aspect-[3/4] overflow-hidden flex items-center justify-center bg-white border border-gray-100 rounded-lg">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.url} alt={item.file.name} className="max-w-full max-h-full object-contain" />
+                      </div>
+                      <p className="font-semibold text-xs text-gray-700 mt-2 truncate w-full text-center" title={item.file.name}>
+                        {i + 1}. {item.file.name}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center justify-center gap-1 mt-3 pt-2 border-t border-gray-200/60">
+                      <button
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0}
+                        className="p-1 rounded bg-white border border-gray-200 text-xs hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        title="ย้ายก่อนหน้า"
+                      >
+                        ◀
+                      </button>
+                      <button
+                        onClick={() => move(i, 1)}
+                        disabled={i === items.length - 1}
+                        className="p-1 rounded bg-white border border-gray-200 text-xs hover:bg-gray-100 disabled:opacity-20 disabled:cursor-not-allowed cursor-pointer"
+                        title="ย้ายไปหลัง"
+                      >
+                        ▶
+                      </button>
+                      <button
+                        onClick={() => remove(i)}
+                        className="p-1 rounded bg-red-50 border border-red-100 text-xs text-red-600 hover:bg-red-500 hover:text-white transition cursor-pointer"
+                        title="นำออก"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
