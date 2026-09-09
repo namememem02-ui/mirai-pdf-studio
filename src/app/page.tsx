@@ -3,6 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { TOOLS } from '@/lib/tools';
 import ToolCard from '@/components/ToolCard';
+import {
+  getCachedUsage,
+  fetchGlobalUsage,
+  USAGE_UPDATED_EVENT,
+} from '@/lib/usage';
 
 interface ToolCategory {
   title: string;
@@ -34,11 +39,35 @@ const CATEGORIES: ToolCategory[] = [
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [usageStats, setUsageStats] = useState<Record<string, number>>({});
 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
 
   useEffect(() => {
+    // 1. อ่านแคชในเครื่องทันทีก่อน (Fast initial display)
+    const cached = getCachedUsage();
+    if (cached?.tools) {
+      setUsageStats(cached.tools);
+    }
+
+    // 2. ดึงข้อมูลล่าสุดจากเซิร์ฟเวอร์
+    fetchGlobalUsage().then((data) => {
+      if (data?.tools) {
+        setUsageStats(data.tools);
+      }
+    });
+
+    // 3. ฟังสัญญาณอัปเดตแบบเรียลไทม์
+    const handleUsageUpdate = (e: Event) => {
+      const customEvent = e as CustomEvent<{ data?: { tools?: Record<string, number> } }>;
+      if (customEvent.detail?.data?.tools) {
+        setUsageStats(customEvent.detail.data.tools);
+      }
+    };
+
+    window.addEventListener(USAGE_UPDATED_EVENT, handleUsageUpdate);
+
     const handleBeforeInstallPrompt = (e: any) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -52,6 +81,7 @@ export default function Home() {
     }
 
     return () => {
+      window.removeEventListener(USAGE_UPDATED_EVENT, handleUsageUpdate);
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
@@ -181,7 +211,11 @@ export default function Home() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {catTools.map((tool) => (
-                  <ToolCard key={tool.id} tool={tool} />
+                  <ToolCard
+                    key={tool.id}
+                    tool={tool}
+                    usageCount={usageStats[tool.id] || 0}
+                  />
                 ))}
               </div>
             </div>

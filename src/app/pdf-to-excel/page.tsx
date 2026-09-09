@@ -7,6 +7,7 @@ import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, baseName } from '@/lib/pdf';
 import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { recordToolUsage } from '@/lib/usage';
 
 import { reconstructGrid, RawTextItem } from '@/lib/pdf-to-excel';
 
@@ -144,6 +145,7 @@ export default function PdfToExcelPage() {
       });
 
       const id = addToQueue(outName, excelBlob);
+      recordToolUsage('pdf-to-excel');
       setResultItemId(id);
       setDone(true);
     } catch (e) {

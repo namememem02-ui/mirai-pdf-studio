@@ -9,6 +9,7 @@ import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
 import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import { recordToolUsage } from '@/lib/usage';
 
 interface TextInstance {
   id: string;
@@ -843,6 +844,7 @@ export default function CombinedPdfEditorPage() {
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const id = addToQueue(outName, blob);
+      recordToolUsage('add-text');
       setResultItemId(id);
       setDone(true);
     } catch (err) {

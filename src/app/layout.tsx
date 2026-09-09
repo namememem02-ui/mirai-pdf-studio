@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { DownloadQueueProvider } from "@/context/DownloadQueueContext";
 import HeaderNav from "@/components/HeaderNav";
+import GlobalUsageBadge from "@/components/GlobalUsageBadge";
 
 export const metadata: Metadata = {
   title: "Mee-a-rai PDF Studio — เครื่องมือจัดการเอกสาร PDF ความปลอดภัยสูง",
@@ -20,6 +21,8 @@ export default function RootLayout({
           <HeaderNav />
 
           <div className="flex-1">{children}</div>
+
+          <GlobalUsageBadge />
 
           <footer className="border-t border-gray-200 bg-white">
             <div className="max-w-5xl mx-auto px-4 py-4 text-center text-xs text-gray-400 font-semibold">

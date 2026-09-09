@@ -8,6 +8,7 @@ import ActionButton from '@/components/ActionButton';
 import { downloadBlob, baseName } from '@/lib/pdf';
 import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import { recordToolUsage } from '@/lib/usage';
 
 export default function ProtectPage() {
   const { addToQueue, queue, downloadItem } = useDownloadQueue();
@@ -82,6 +83,7 @@ export default function ProtectPage() {
       const outName = `${baseName(file.name)}_protected.pdf`;
       const blob = new Blob([encryptedBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const id = addToQueue(outName, blob);
+      recordToolUsage('protect');
       setResultItemId(id);
       setDone(true);
     } catch (e) {

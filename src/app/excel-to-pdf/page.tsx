@@ -10,6 +10,7 @@ import ActionButton from '@/components/ActionButton';
 import { baseName } from '@/lib/pdf';
 import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import { recordToolUsage } from '@/lib/usage';
 
 export default function ExcelToPdfPage() {
   const { addToQueue, queue, downloadItem } = useDownloadQueue();
@@ -174,6 +175,7 @@ export default function ExcelToPdfPage() {
       const outName = `${baseName(file!.name)}_${selectedSheet}.pdf`;
       const pdfBlob = doc.output('blob');
       const id = addToQueue(outName, pdfBlob);
+      recordToolUsage('excel-to-pdf');
       setResultItemId(id);
       setDone(true);
     } catch (e) {

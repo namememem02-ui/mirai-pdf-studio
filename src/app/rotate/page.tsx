@@ -8,6 +8,7 @@ import ActionButton from '@/components/ActionButton';
 import { getPdfjs, downloadBlob, baseName } from '@/lib/pdf';
 import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import { recordToolUsage } from '@/lib/usage';
 
 interface PageThumbnail {
   index: number;
@@ -117,6 +118,7 @@ export default function RotatePage() {
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const id = addToQueue(outName, blob);
+      recordToolUsage('rotate');
       setResultItemId(id);
       setDone(true);
     } catch (e) {

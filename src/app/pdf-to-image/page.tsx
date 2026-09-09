@@ -7,6 +7,7 @@ import ActionButton from '@/components/ActionButton';
 import { getPdfjs, baseName } from '@/lib/pdf';
 import { createZipBlob } from '@/lib/download';
 import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { recordToolUsage } from '@/lib/usage';
 
 interface PageImage {
   page: number;
@@ -56,6 +57,7 @@ export default function PdfToImagePage() {
         out.push({ page: p, blob, url: URL.createObjectURL(blob) });
       }
       setImages(out);
+      recordToolUsage('pdf-to-image');
     } catch (e) {
       setError('แปลงไม่สำเร็จ: ' + (e instanceof Error ? e.message : 'ไฟล์อาจเสียหายหรือถูกล็อก'));
     } finally {

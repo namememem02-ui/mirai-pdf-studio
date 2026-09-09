@@ -7,6 +7,7 @@ import ActionButton from '@/components/ActionButton';
 import { baseName, getPdfjs } from '@/lib/pdf';
 import { splitSelectedPages } from '@/lib/split-pages';
 import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { recordToolUsage } from '@/lib/usage';
 
 interface Thumbnail { index: number; url: string }
 interface Result { id: string; filename: string; page: number }
@@ -57,6 +58,7 @@ export default function SplitPagesPage() {
       setProgress(`กำลังแยก ${selected.length} หน้าเป็นไฟล์ PDF...`);
       const outputs = await splitSelectedPages(await file.arrayBuffer(), file.name, selected);
       setResults(outputs.map((output, index) => ({ id: addToQueue(output.filename, output.blob), filename: output.filename, page: selected[index] + 1 })));
+      recordToolUsage('split-pages');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'แยกหน้า PDF ไม่สำเร็จ');
     } finally { setBusy(false); setProgress(''); }

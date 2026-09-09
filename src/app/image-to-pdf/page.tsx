@@ -8,6 +8,7 @@ import ActionButton from '@/components/ActionButton';
 import { downloadBlob } from '@/lib/pdf';
 import { useDownloadQueue, DownloadItem } from '@/context/DownloadQueueContext';
 import PDFPreviewModal from '@/components/PDFPreviewModal';
+import { recordToolUsage } from '@/lib/usage';
 
 interface ImageItem {
   file: File;
@@ -107,6 +108,7 @@ export default function ImageToPdfPage() {
       const outBytes = await doc.save();
       const blob = new Blob([outBytes.buffer as ArrayBuffer], { type: 'application/pdf' });
       const id = addToQueue('images.pdf', blob);
+      recordToolUsage('image-to-pdf');
       setResultItemId(id);
       setDone(true);
     } catch (e) {

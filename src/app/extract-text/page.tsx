@@ -7,6 +7,7 @@ import FileDropzone from '@/components/FileDropzone';
 import ActionButton from '@/components/ActionButton';
 import { getPdfjs, baseName } from '@/lib/pdf';
 import { useDownloadQueue } from '@/context/DownloadQueueContext';
+import { recordToolUsage } from '@/lib/usage';
 
 export default function ExtractTextPage() {
   const { requestBlobDownload } = useDownloadQueue();
@@ -92,6 +93,7 @@ export default function ExtractTextPage() {
 
       const result = parts.join('\n\n');
       setText(result);
+      recordToolUsage('extract-text');
 
       // Validation
       const rawContent = result
