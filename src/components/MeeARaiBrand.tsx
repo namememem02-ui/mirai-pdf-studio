@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 
 interface MeeARaiBrandProps {
   appName: string;
@@ -28,8 +29,8 @@ export default function MeeARaiBrand({
     return () => document.removeEventListener('pointerdown', closeOnOutsidePointer);
   }, []);
 
-  const pointerType = (event: React.PointerEvent<HTMLButtonElement>) => event.pointerType;
-  const isHoverPointer = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const pointerType = (event: React.PointerEvent<HTMLElement>) => event.pointerType;
+  const isHoverPointer = (event: React.PointerEvent<HTMLElement>) => {
     const type = pointerType(event);
     return type === 'mouse' || type === 'pen';
   };
@@ -48,8 +49,9 @@ export default function MeeARaiBrand({
         } as React.CSSProperties
       }
     >
-      <button
-        type="button"
+      <Link
+        href="/"
+        role="button"
         className="mee-arai-brand__trigger"
         aria-label="Toggle Mee-a-rai brand"
         aria-expanded={isExpanded}
@@ -80,7 +82,7 @@ export default function MeeARaiBrand({
         }}
       >
         <span aria-hidden="true">{isExpanded ? 'Mee-a-rai' : 'M'}</span>
-      </button>
+      </Link>
       <span className="mee-arai-brand__separator" aria-hidden="true">|</span>
       <span className="mee-arai-brand__app-name" data-testid="mee-arai-app-name" title={appName}>
         {appName}
