@@ -51,12 +51,14 @@ function EditablePage({
 
   useEffect(() => {
     let active = true;
+    let renderTask: any = null;
+
     const renderPage = async () => {
       setLoading(true);
       try {
         const page = await pdfDoc.getPage(pageNumber);
-        const viewport = page.getViewport({ scale });
         if (!active) return;
+        const viewport = page.getViewport({ scale });
         setDimensions({ width: viewport.width, height: viewport.height });
 
         const canvas = canvasRef.current;
@@ -64,16 +66,28 @@ function EditablePage({
         canvas.width = viewport.width;
         canvas.height = viewport.height;
         const ctx = canvas.getContext('2d')!;
-        await page.render({ canvasContext: ctx, viewport }).promise;
-        setLoading(false);
-      } catch (err) {
-        console.error('Error rendering page:', err);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        renderTask = page.render({ canvasContext: ctx, viewport });
+        await renderTask.promise;
+        if (active) setLoading(false);
+      } catch (err: any) {
+        if (err?.name !== 'RenderingCancelledException') {
+          console.error('Error rendering page:', err);
+        }
       }
     };
     renderPage();
 
     return () => {
       active = false;
+      if (renderTask) {
+        try {
+          renderTask.cancel();
+        } catch {
+          // Ignore cancellation
+        }
+      }
     };
   }, [pdfDoc, pageNumber, scale]);
 
@@ -187,7 +201,14 @@ export default function SignaturePage() {
 
   // Zoom and responsive scaling states
   const containerRef = useRef<HTMLDivElement>(null);
-  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [containerWidth, setContainerWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 1024
+        ? Math.max(300, window.innerWidth - 32)
+        : Math.min(1050, Math.max(600, window.innerWidth - 380));
+    }
+    return 0;
+  });
   const [basePageWidth, setBasePageWidth] = useState<number>(595.28);
   const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
   const [customScale, setCustomScale] = useState<number>(1.0);
@@ -215,8 +236,11 @@ export default function SignaturePage() {
     }).catch((err: any) => console.warn('Could not read base page width', err));
   }, [pdfDoc]);
 
+  // Compute effective scale:
+  // - Fits mobile/tablet screen widths without overflowing
+  // - On large widescreen desktop, caps at 1.15 to avoid over-stretching to 200%
   const fitScale = containerWidth > 0
-    ? Math.min(2.0, Math.max(0.35, Number(((containerWidth - 36) / (basePageWidth || 595.28)).toFixed(3))))
+    ? Math.min(1.15, Math.max(0.35, Number(((containerWidth - 36) / (basePageWidth || 595.28)).toFixed(3))))
     : 1.0;
 
   const effectiveScale = zoomMode === 'fit' ? fitScale : customScale;
