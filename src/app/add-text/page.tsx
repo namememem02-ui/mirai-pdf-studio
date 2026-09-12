@@ -64,6 +64,7 @@ interface EditablePageProps {
   brushThickness: number;
   selectedTextId: string | null;
   selectedEraserId: string | null;
+  editingTextId: string | null;
   onAddText: (pageIndex: number, x: number, y: number, renderedWidth: number, renderedHeight: number) => void;
   onAddEraser: (
     pageIndex: number,
@@ -78,8 +79,183 @@ interface EditablePageProps {
   onSelectText: (id: string) => void;
   onSelectEraser: (id: string) => void;
   onDeleteLine: (id: string) => void;
+  onDeleteText: (id: string) => void;
+  onDeleteEraser: (id: string) => void;
+  onUpdateTextVal: (id: string, text: string) => void;
+  onSetEditingTextId: (id: string | null) => void;
   onStartDragText: (e: React.PointerEvent | React.MouseEvent, id: string, currentWidth: number, currentHeight: number) => void;
   onStartDragEraser: (e: React.PointerEvent | React.MouseEvent, id: string, currentWidth: number, currentHeight: number) => void;
+}
+
+function TextAnnotationItem({
+  inst,
+  dimensions,
+  isSelected,
+  isEditing,
+  onSelect,
+  onStartEdit,
+  onEndEdit,
+  onUpdateText,
+  onDelete,
+  onStartDrag,
+}: {
+  inst: TextInstance;
+  dimensions: { width: number; height: number };
+  isSelected: boolean;
+  isEditing: boolean;
+  onSelect: () => void;
+  onStartEdit: () => void;
+  onEndEdit: () => void;
+  onUpdateText: (text: string) => void;
+  onDelete: () => void;
+  onStartDrag: (e: React.PointerEvent | React.MouseEvent) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const leftPct = (inst.x / inst.renderedWidth) * 100;
+  const topPct = (inst.y / inst.renderedHeight) * 100;
+  const currentFontSize =
+    dimensions.height > 0 && inst.renderedHeight > 0
+      ? (inst.fontSize / inst.renderedHeight) * dimensions.height
+      : inst.fontSize;
+
+  return (
+    <div
+      data-annotation="text"
+      className={`absolute p-1 rounded z-20 transition-all ${
+        isSelected
+          ? 'border-2 border-pink-500 bg-white/90 shadow-lg ring-2 ring-pink-500/25'
+          : 'border border-dashed border-pink-400 hover:border-pink-600 bg-white/50 cursor-move'
+      }`}
+      style={{
+        left: `${leftPct}%`,
+        top: `${topPct}%`,
+        transform: 'translate(-50%, -50%)',
+        whiteSpace: 'nowrap',
+        touchAction: 'none',
+      }}
+      onClick={(e) => {
+        e.stopPropagation();
+        if (isSelected && !isEditing) {
+          onStartEdit();
+        } else {
+          onSelect();
+        }
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation();
+        onSelect();
+        onStartEdit();
+      }}
+      onPointerDown={(e) => {
+        if (isEditing) {
+          e.stopPropagation();
+          return;
+        }
+        e.stopPropagation();
+        onStartDrag(e);
+        onSelect();
+      }}
+    >
+      {/* Floating Toolbar above selected text box */}
+      {isSelected && (
+        <div
+          className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-gray-900/90 text-white text-[11px] font-medium py-0.5 px-2.5 rounded-full shadow-lg pointer-events-auto z-30 whitespace-nowrap select-none animate-fadeIn"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {!isEditing ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onStartEdit();
+              }}
+              className="hover:text-pink-300 flex items-center gap-1 transition cursor-pointer"
+              title="พิมพ์แก้ไขข้อความตรงนี้"
+            >
+              <span>✏️</span> แก้ไข
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onEndEdit();
+              }}
+              className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition cursor-pointer font-bold"
+              title="เสร็จสิ้นการแก้ไข"
+            >
+              <span>✓</span> เสร็จสิ้น
+            </button>
+          )}
+          <span className="text-gray-600">|</span>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete();
+            }}
+            className="hover:text-red-400 flex items-center gap-1 transition cursor-pointer"
+            title="ลบข้อความนี้"
+          >
+            <span>🗑️</span> ลบ
+          </button>
+        </div>
+      )}
+
+      {/* Content: Input when editing, Span when displaying */}
+      {isEditing ? (
+        <div className="relative flex items-center">
+          <input
+            ref={inputRef}
+            type="text"
+            value={inst.text}
+            onChange={(e) => onUpdateText(e.target.value)}
+            onBlur={onEndEdit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === 'Escape') {
+                e.preventDefault();
+                onEndEdit();
+              }
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="bg-white text-gray-900 border border-pink-500 rounded px-1.5 py-0.5 shadow-inner outline-none ring-2 ring-pink-400/40"
+            style={{
+              fontSize: `${Math.max(10, currentFontSize)}px`,
+              color: inst.color,
+              fontWeight: inst.isBold ? 'bold' : 'normal',
+              fontStyle: inst.isItalic ? 'italic' : 'normal',
+              fontFamily: 'Sarabun, sans-serif',
+              minWidth: '90px',
+              width: `${Math.max(90, (inst.text.length + 2) * (currentFontSize * 0.7))}px`,
+            }}
+          />
+        </div>
+      ) : (
+        <span
+          style={{
+            fontSize: `${Math.max(8, currentFontSize)}px`,
+            color: inst.color,
+            fontWeight: inst.isBold ? 'bold' : 'normal',
+            fontStyle: inst.isItalic ? 'italic' : 'normal',
+            fontFamily: 'Sarabun, sans-serif',
+            userSelect: 'none',
+          }}
+        >
+          {inst.text || <span className="text-gray-400 italic text-xs">(คลิกเพื่อพิมพ์)</span>}
+        </span>
+      )}
+    </div>
+  );
 }
 
 function EditablePage({
@@ -99,12 +275,17 @@ function EditablePage({
   brushThickness,
   selectedTextId,
   selectedEraserId,
+  editingTextId,
   onAddText,
   onAddEraser,
   onAddLine,
   onSelectText,
   onSelectEraser,
   onDeleteLine,
+  onDeleteText,
+  onDeleteEraser,
+  onUpdateTextVal,
+  onSetEditingTextId,
   onStartDragText,
   onStartDragEraser,
 }: EditablePageProps) {
@@ -375,60 +556,46 @@ function EditablePage({
                 onStartDragEraser(e, inst.id, dimensions.width, dimensions.height);
                 onSelectEraser(inst.id);
               }}
-            />
+            >
+              {isSelected && (
+                <div
+                  className="absolute -top-7 left-1/2 -translate-x-1/2 flex items-center gap-1.5 bg-gray-900/90 text-white text-[11px] font-medium py-0.5 px-2.5 rounded-full shadow-lg pointer-events-auto z-30 whitespace-nowrap select-none animate-fadeIn"
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteEraser(inst.id);
+                    }}
+                    className="hover:text-red-400 flex items-center gap-1 transition cursor-pointer"
+                    title="ลบกล่องยางลบนี้"
+                  >
+                    <span>🗑️</span> ลบ
+                  </button>
+                </div>
+              )}
+            </div>
           );
         })}
 
         {/* Rendered Text Annotations */}
-        {textInstances.map((inst) => {
-          const isSelected = selectedTextId === inst.id;
-          const leftPct = (inst.x / inst.renderedWidth) * 100;
-          const topPct = (inst.y / inst.renderedHeight) * 100;
-          const currentFontSize = dimensions.height > 0 && inst.renderedHeight > 0
-            ? (inst.fontSize / inst.renderedHeight) * dimensions.height
-            : inst.fontSize;
-
-          return (
-            <div
-              key={inst.id}
-              data-annotation="text"
-              className={`absolute p-1.5 rounded cursor-move z-20 transition-shadow ${
-                isSelected
-                  ? 'border-2 border-pink-500 bg-white/70 shadow-lg ring-2 ring-pink-500/20'
-                  : 'border border-dashed border-pink-400 hover:border-pink-600 bg-white/40'
-              }`}
-              style={{
-                left: `${leftPct}%`,
-                top: `${topPct}%`,
-                transform: 'translate(-50%, -50%)',
-                whiteSpace: 'nowrap',
-                touchAction: 'none',
-              }}
-              onClick={(e) => {
-                e.stopPropagation();
-                onSelectText(inst.id);
-              }}
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                onStartDragText(e, inst.id, dimensions.width, dimensions.height);
-                onSelectText(inst.id);
-              }}
-            >
-              <span
-                style={{
-                  fontSize: `${Math.max(8, currentFontSize)}px`,
-                  color: inst.color,
-                  fontWeight: inst.isBold ? 'bold' : 'normal',
-                  fontStyle: inst.isItalic ? 'italic' : 'normal',
-                  fontFamily: 'Sarabun, sans-serif',
-                  userSelect: 'none',
-                }}
-              >
-                {inst.text}
-              </span>
-            </div>
-          );
-        })}
+        {textInstances.map((inst) => (
+          <TextAnnotationItem
+            key={inst.id}
+            inst={inst}
+            dimensions={dimensions}
+            isSelected={selectedTextId === inst.id}
+            isEditing={editingTextId === inst.id}
+            onSelect={() => onSelectText(inst.id)}
+            onStartEdit={() => onSetEditingTextId(inst.id)}
+            onEndEdit={() => onSetEditingTextId(null)}
+            onUpdateText={(text) => onUpdateTextVal(inst.id, text)}
+            onDelete={() => onDeleteText(inst.id)}
+            onStartDrag={(e) => onStartDragText(e, inst.id, dimensions.width, dimensions.height)}
+          />
+        ))}
       </div>
     </div>
   );
@@ -499,6 +666,7 @@ export default function CombinedPdfEditorPage() {
   // Selection states
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null);
   const [selectedEraserId, setSelectedEraserId] = useState<string | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   // Typewriter parameters
   const [activeText, setActiveText] = useState('ข้อความใหม่');
@@ -509,6 +677,32 @@ export default function CombinedPdfEditorPage() {
 
   // Local state for free typing of font size (to avoid React lock when clearing/deleting)
   const [fontSizeInput, setFontSizeInput] = useState<string>('16');
+
+  const handleSelectText = (id: string | null) => {
+    setSelectedTextId(id);
+    if (id !== selectedTextId) {
+      setEditingTextId(null);
+    }
+    if (id) {
+      const matched = textInstances.find((t) => t.id === id);
+      if (matched) {
+        setActiveText(matched.text);
+        setActiveFontSize(matched.fontSize);
+        setFontSizeInput(matched.fontSize.toString());
+        setActiveColor(matched.color);
+        setActiveIsBold(!!matched.isBold);
+        setActiveIsItalic(!!matched.isItalic);
+      }
+    }
+  };
+
+  const handleSelectEraser = (id: string | null) => {
+    setSelectedEraserId(id);
+    if (id) {
+      setSelectedTextId(null);
+      setEditingTextId(null);
+    }
+  };
 
   useEffect(() => {
     const matchedText = textInstances.find((t) => t.id === selectedTextId);
@@ -575,6 +769,7 @@ export default function CombinedPdfEditorPage() {
     setActionHistory([]);
     setSelectedTextId(null);
     setSelectedEraserId(null);
+    setEditingTextId(null);
     setBusy(true);
     setProgress('กำลังโหลดไฟล์ PDF...');
 
@@ -615,6 +810,7 @@ export default function CombinedPdfEditorPage() {
     setTextInstances((prev) => [...prev, newInst]);
     setActionHistory((prev) => [...prev, { type: 'text', id: newInst.id }]);
     setSelectedTextId(newInst.id);
+    setEditingTextId(newInst.id);
     setSelectedEraserId(null);
     setDone(false);
   };
@@ -644,6 +840,7 @@ export default function CombinedPdfEditorPage() {
     setActionHistory((prev) => [...prev, { type: 'box', id: newInst.id }]);
     setSelectedEraserId(newInst.id);
     setSelectedTextId(null);
+    setEditingTextId(null);
     setDone(false);
   };
 
@@ -656,6 +853,9 @@ export default function CombinedPdfEditorPage() {
   // Text specific updates
   const handleUpdateTextVal = (id: string, text: string) => {
     setTextInstances((prev) => prev.map((t) => (t.id === id ? { ...t, text } : t)));
+    if (selectedTextId === id) {
+      setActiveText(text);
+    }
     setDone(false);
   };
   const handleUpdateTextSize = (id: string, fontSize: number) => {
@@ -678,6 +878,7 @@ export default function CombinedPdfEditorPage() {
     setTextInstances((prev) => prev.filter((t) => t.id !== id));
     setActionHistory((prev) => prev.filter((h) => h.id !== id));
     if (selectedTextId === id) setSelectedTextId(null);
+    if (editingTextId === id) setEditingTextId(null);
     setDone(false);
   };
 
@@ -709,6 +910,7 @@ export default function CombinedPdfEditorPage() {
     if (lastAction.type === 'text') {
       setTextInstances((prev) => prev.filter((t) => t.id !== lastAction.id));
       if (selectedTextId === lastAction.id) setSelectedTextId(null);
+      if (editingTextId === lastAction.id) setEditingTextId(null);
     } else if (lastAction.type === 'box') {
       setEraserInstances((prev) => prev.filter((e) => e.id !== lastAction.id));
       if (selectedEraserId === lastAction.id) setSelectedEraserId(null);
@@ -1363,8 +1565,7 @@ export default function CombinedPdfEditorPage() {
                         key={inst.id}
                         onClick={() => {
                           setEditorMode('text');
-                          setSelectedTextId(inst.id);
-                          setSelectedEraserId(null);
+                          handleSelectText(inst.id);
                         }}
                         className={`flex items-center justify-between p-2 rounded cursor-pointer border transition ${
                           selectedTextId === inst.id
@@ -1393,8 +1594,7 @@ export default function CombinedPdfEditorPage() {
                         key={inst.id}
                         onClick={() => {
                           setEditorMode('box');
-                          setSelectedEraserId(inst.id);
-                          setSelectedTextId(null);
+                          handleSelectEraser(inst.id);
                         }}
                         className={`flex items-center justify-between p-2 rounded cursor-pointer border transition ${
                           selectedEraserId === inst.id
@@ -1448,7 +1648,7 @@ export default function CombinedPdfEditorPage() {
             <div ref={containerRef} className="lg:col-span-8 xl:col-span-9 flex flex-col items-center w-full min-w-0">
               <div className="w-full bg-pink-50 border border-pink-100 text-pink-850 rounded-lg p-3 text-xs font-semibold text-center mb-3 shadow-sm leading-relaxed">
                 {editorMode === 'text' ? (
-                  <p>✍️ **พิมพ์คำที่จะเขียน (ที่แผงควบคุม)** แล้ว **คลิก/แตะจุดบนกระดาษ** เพื่อวางตัวอักษรลงในหน้านั้นๆ | ลากย้ายปรับเปลี่ยนสีและขนาดฟอนต์ภายหลังได้อิสระ</p>
+                  <p>✍️ **คลิกจุดบนกระดาษ** เพื่อวางข้อความใหม่ (ดับเบิลคลิกหรือแตะที่คำเพื่อ **พิมพ์แก้ไขบนกระดาษได้ทันที**) | หรือพิมพ์ที่แผงควบคุมด้านซ้าย</p>
                 ) : editorMode === 'box' ? (
                   <p>📐 **คลิกค้างแล้วลากเมาส์/นิ้ว** บนกระดาษเพื่อ **ตีกรอบสี่เหลี่ยมยางลบ** ถมสีทับคำเดิม (คลิกกรอบเพื่อเลือกปรับความยาวความสูงได้ที่แถบด้านซ้าย)</p>
                 ) : (
@@ -1542,16 +1742,21 @@ export default function CombinedPdfEditorPage() {
                     brushThickness={brushThickness}
                     selectedTextId={selectedTextId}
                     selectedEraserId={selectedEraserId}
+                    editingTextId={editingTextId}
                     onAddText={handleAddText}
                     onAddEraser={handleAddEraser}
                     onAddLine={handleAddLine}
-                    onSelectText={setSelectedTextId}
-                    onSelectEraser={setSelectedEraserId}
+                    onSelectText={handleSelectText}
+                    onSelectEraser={handleSelectEraser}
                     onDeleteLine={(id) => {
                       setEraserLines((prev) => prev.filter((l) => l.id !== id));
                       setActionHistory((prev) => prev.filter((act) => act.id !== id));
                       setDone(false);
                     }}
+                    onDeleteText={handleDeleteText}
+                    onDeleteEraser={handleDeleteEraser}
+                    onUpdateTextVal={handleUpdateTextVal}
+                    onSetEditingTextId={setEditingTextId}
                     onStartDragText={handleStartDragText}
                     onStartDragEraser={handleStartDragEraser}
                   />
