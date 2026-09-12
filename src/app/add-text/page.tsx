@@ -50,6 +50,7 @@ interface EraserLine {
 interface EditablePageProps {
   pageNumber: number;
   pdfDoc: any;
+  scale: number;
   textInstances: TextInstance[];
   eraserInstances: EraserInstance[];
   eraserLines: EraserLine[];
@@ -77,13 +78,14 @@ interface EditablePageProps {
   onSelectText: (id: string) => void;
   onSelectEraser: (id: string) => void;
   onDeleteLine: (id: string) => void;
-  onStartDragText: (e: React.MouseEvent, id: string) => void;
-  onStartDragEraser: (e: React.MouseEvent, id: string) => void;
+  onStartDragText: (e: React.PointerEvent | React.MouseEvent, id: string, currentWidth: number, currentHeight: number) => void;
+  onStartDragEraser: (e: React.PointerEvent | React.MouseEvent, id: string, currentWidth: number, currentHeight: number) => void;
 }
 
 function EditablePage({
   pageNumber,
   pdfDoc,
+  scale,
   textInstances,
   eraserInstances,
   eraserLines,
@@ -123,7 +125,7 @@ function EditablePage({
       setLoading(true);
       try {
         const page = await pdfDoc.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 1.25 });
+        const viewport = page.getViewport({ scale });
         if (!active) return;
         setDimensions({ width: viewport.width, height: viewport.height });
 
@@ -143,15 +145,21 @@ function EditablePage({
     return () => {
       active = false;
     };
-  }, [pdfDoc, pageNumber]);
+  }, [pdfDoc, pageNumber, scale]);
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-annotation]') || target.closest('button')) {
+      return;
+    }
+
     const rect = e.currentTarget.getBoundingClientRect();
     const startX = e.clientX - rect.left;
     const startY = e.clientY - rect.top;
 
     if (editorMode === 'text') {
-      // Direct click placing text
       onAddText(pageNumber - 1, startX, startY, rect.width, rect.height);
       return;
     }
@@ -167,11 +175,10 @@ function EditablePage({
       setPencilPoints(initialPoints);
     }
 
-    const handleGlobalMouseMove = (moveEvent: MouseEvent) => {
+    const handleGlobalPointerMove = (moveEvent: PointerEvent) => {
       const currentX = moveEvent.clientX - rect.left;
       const currentY = moveEvent.clientY - rect.top;
 
-      // Constrain inside page boundaries
       const boundedX = Math.max(0, Math.min(rect.width, currentX));
       const boundedY = Math.max(0, Math.min(rect.height, currentY));
 
@@ -188,9 +195,10 @@ function EditablePage({
       }
     };
 
-    const handleGlobalMouseUp = (upEvent: MouseEvent) => {
-      document.removeEventListener('mousemove', handleGlobalMouseMove);
-      document.removeEventListener('mouseup', handleGlobalMouseUp);
+    const handleGlobalPointerUp = (upEvent: PointerEvent) => {
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
 
       setIsDrawing(false);
       setStartPos(null);
@@ -209,10 +217,10 @@ function EditablePage({
         const y = Math.min(startY, boundedEndY);
 
         if (w < 6 && h < 6) {
-          // Default sized box
-          onAddEraser(pageNumber - 1, startX, startY, 100, 25, rect.width, rect.height);
+          const defaultW = Math.min(100, Math.max(30, rect.width * 0.15));
+          const defaultH = Math.min(25, Math.max(15, rect.height * 0.03));
+          onAddEraser(pageNumber - 1, startX, startY, defaultW, defaultH, rect.width, rect.height);
         } else {
-          // Drag-drawn box
           const centerX = x + w / 2;
           const centerY = y + h / 2;
           onAddEraser(pageNumber - 1, centerX, centerY, w, h, rect.width, rect.height);
@@ -235,8 +243,9 @@ function EditablePage({
       }
     };
 
-    document.addEventListener('mousemove', handleGlobalMouseMove);
-    document.addEventListener('mouseup', handleGlobalMouseUp);
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
   };
 
   return (
@@ -246,8 +255,12 @@ function EditablePage({
         className={`relative border border-gray-300 bg-white shadow-md mb-8 ${
           editorMode === 'text' ? 'cursor-text' : editorMode === 'pencil' ? 'cursor-pencil' : 'cursor-crosshair'
         }`}
-        style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
-        onMouseDown={handleMouseDown}
+        style={{
+          width: `${dimensions.width}px`,
+          height: `${dimensions.height}px`,
+          touchAction: 'none',
+        }}
+        onPointerDown={handlePointerDown}
       >
         <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none z-0" />
 
@@ -258,26 +271,32 @@ function EditablePage({
         )}
 
         {/* Freehand SVG Overlay for Pencil Strokes */}
-        <svg className="absolute inset-0 z-10 w-full h-full" style={{ pointerEvents: 'none' }}>
-          {eraserLines.map((line) => (
-            <polyline
-              key={line.id}
-              points={line.points.map((p) => `${p.x},${p.y}`).join(' ')}
-              fill="none"
-              stroke={line.color}
-              strokeWidth={line.thickness}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="hover:opacity-85 transition-opacity"
-              style={{ pointerEvents: 'visibleStroke', cursor: 'pointer' }}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (confirm('ต้องการลบเส้นวาดดินสอนี้ใช่หรือไม่?')) {
-                  onDeleteLine(line.id);
-                }
-              }}
-            />
-          ))}
+        <svg className="absolute inset-0 z-10 w-full h-full pointer-events-none">
+          {eraserLines.map((line) => {
+            const scaleX = dimensions.width > 0 && line.renderedWidth > 0 ? dimensions.width / line.renderedWidth : 1;
+            const scaleY = dimensions.height > 0 && line.renderedHeight > 0 ? dimensions.height / line.renderedHeight : 1;
+            const scaledPoints = line.points.map((p) => `${p.x * scaleX},${p.y * scaleY}`).join(' ');
+            const scaledThickness = Math.max(1, line.thickness * scaleY);
+
+            return (
+              <polyline
+                key={line.id}
+                points={scaledPoints}
+                fill="none"
+                stroke={line.color}
+                strokeWidth={scaledThickness}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="hover:opacity-85 transition-opacity pointer-events-auto cursor-pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (confirm('ต้องการลบเส้นวาดดินสอนี้ใช่หรือไม่?')) {
+                    onDeleteLine(line.id);
+                  }
+                }}
+              />
+            );
+          })}
           {/* Active drawing line preview */}
           {editorMode === 'pencil' && isDrawing && pencilPoints.length > 0 && (
             <polyline
@@ -310,29 +329,36 @@ function EditablePage({
         {/* Rendered Solid Eraser Rectangles */}
         {eraserInstances.map((inst) => {
           const isSelected = selectedEraserId === inst.id;
+          const leftPct = (inst.x / inst.renderedWidth) * 100;
+          const topPct = (inst.y / inst.renderedHeight) * 100;
+          const widthPct = (inst.width / inst.renderedWidth) * 100;
+          const heightPct = (inst.height / inst.renderedHeight) * 100;
+
           return (
             <div
               key={inst.id}
+              data-annotation="eraser"
               className={`absolute border transition-shadow z-20 cursor-move ${
                 isSelected
                   ? 'border-pink-500 ring-2 ring-pink-500/35 shadow-lg scale-[1.01]'
                   : 'border-dashed border-gray-400 hover:border-gray-600'
               }`}
               style={{
-                left: `${inst.x}px`,
-                top: `${inst.y}px`,
-                width: `${inst.width}px`,
-                height: `${inst.height}px`,
+                left: `${leftPct}%`,
+                top: `${topPct}%`,
+                width: `${widthPct}%`,
+                height: `${heightPct}%`,
                 transform: 'translate(-50%, -50%)',
                 backgroundColor: inst.color,
+                touchAction: 'none',
               }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectEraser(inst.id);
               }}
-              onMouseDown={(e) => {
+              onPointerDown={(e) => {
                 e.stopPropagation();
-                onStartDragEraser(e, inst.id);
+                onStartDragEraser(e, inst.id, dimensions.width, dimensions.height);
                 onSelectEraser(inst.id);
               }}
             />
@@ -342,37 +368,46 @@ function EditablePage({
         {/* Rendered Text Annotations */}
         {textInstances.map((inst) => {
           const isSelected = selectedTextId === inst.id;
+          const leftPct = (inst.x / inst.renderedWidth) * 100;
+          const topPct = (inst.y / inst.renderedHeight) * 100;
+          const currentFontSize = dimensions.height > 0 && inst.renderedHeight > 0
+            ? (inst.fontSize / inst.renderedHeight) * dimensions.height
+            : inst.fontSize;
+
           return (
             <div
               key={inst.id}
+              data-annotation="text"
               className={`absolute p-1.5 rounded cursor-move z-20 transition-shadow ${
                 isSelected
                   ? 'border-2 border-pink-500 bg-white/70 shadow-lg ring-2 ring-pink-500/20'
                   : 'border border-dashed border-pink-400 hover:border-pink-600 bg-white/40'
               }`}
               style={{
-                left: `${inst.x}px`,
-                top: `${inst.y}px`,
+                left: `${leftPct}%`,
+                top: `${topPct}%`,
                 transform: 'translate(-50%, -50%)',
                 whiteSpace: 'nowrap',
+                touchAction: 'none',
               }}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectText(inst.id);
               }}
-              onMouseDown={(e) => {
+              onPointerDown={(e) => {
                 e.stopPropagation();
-                onStartDragText(e, inst.id);
+                onStartDragText(e, inst.id, dimensions.width, dimensions.height);
                 onSelectText(inst.id);
               }}
             >
               <span
                 style={{
-                  fontSize: `${inst.fontSize}px`,
+                  fontSize: `${Math.max(8, currentFontSize)}px`,
                   color: inst.color,
                   fontWeight: inst.isBold ? 'bold' : 'normal',
                   fontStyle: inst.isItalic ? 'italic' : 'normal',
                   fontFamily: 'Sarabun, sans-serif',
+                  userSelect: 'none',
                 }}
               >
                 {inst.text}
@@ -391,6 +426,43 @@ export default function CombinedPdfEditorPage() {
   const [file, setFile] = useState<File | null>(null);
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pageCount, setPageCount] = useState(0);
+
+  // Zoom and responsive scaling states
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [basePageWidth, setBasePageWidth] = useState<number>(595.28);
+  const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
+  const [customScale, setCustomScale] = useState<number>(1.0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [file]);
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    pdfDoc.getPage(1).then((page: any) => {
+      const vp = page.getViewport({ scale: 1.0 });
+      if (vp && vp.width > 0) {
+        setBasePageWidth(vp.width);
+      }
+    }).catch((err: any) => console.warn('Could not read base page width', err));
+  }, [pdfDoc]);
+
+  // Compute effective scale: on 'fit' mode, adjust dynamically to container width
+  const fitScale = containerWidth > 0
+    ? Math.min(2.0, Math.max(0.35, Number(((containerWidth - 36) / (basePageWidth || 595.28)).toFixed(3))))
+    : 1.0;
+
+  const effectiveScale = zoomMode === 'fit' ? fitScale : customScale;
 
   // Editor mode selection
   const [editorMode, setEditorMode] = useState<'text' | 'box' | 'pencil'>('text');
@@ -625,7 +697,12 @@ export default function CombinedPdfEditorPage() {
     setDone(false);
   };
 
-  const handleStartDragText = (e: React.MouseEvent, id: string) => {
+  const handleStartDragText = (
+    e: React.PointerEvent | React.MouseEvent,
+    id: string,
+    currentWidth: number,
+    currentHeight: number
+  ) => {
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
@@ -636,9 +713,12 @@ export default function CombinedPdfEditorPage() {
     const initialX = inst.x;
     const initialY = inst.y;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
+    const scaleX = currentWidth > 0 ? inst.renderedWidth / currentWidth : 1;
+    const scaleY = currentHeight > 0 ? inst.renderedHeight / currentHeight : 1;
+
+    const handlePointerMove = (moveEvent: PointerEvent | MouseEvent) => {
+      const dx = (moveEvent.clientX - startX) * scaleX;
+      const dy = (moveEvent.clientY - startY) * scaleY;
 
       const nextX = Math.max(0, Math.min(inst.renderedWidth, initialX + dx));
       const nextY = Math.max(0, Math.min(inst.renderedHeight, initialY + dy));
@@ -646,16 +726,27 @@ export default function CombinedPdfEditorPage() {
       setTextInstances((prev) => prev.map((t) => (t.id === id ? { ...t, x: nextX, y: nextY } : t)));
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      document.removeEventListener('mousemove', handlePointerMove);
+      document.removeEventListener('mouseup', handlePointerUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerUp);
   };
 
-  const handleStartDragEraser = (e: React.MouseEvent, id: string) => {
+  const handleStartDragEraser = (
+    e: React.PointerEvent | React.MouseEvent,
+    id: string,
+    currentWidth: number,
+    currentHeight: number
+  ) => {
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
@@ -666,9 +757,12 @@ export default function CombinedPdfEditorPage() {
     const initialX = inst.x;
     const initialY = inst.y;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
+    const scaleX = currentWidth > 0 ? inst.renderedWidth / currentWidth : 1;
+    const scaleY = currentHeight > 0 ? inst.renderedHeight / currentHeight : 1;
+
+    const handlePointerMove = (moveEvent: PointerEvent | MouseEvent) => {
+      const dx = (moveEvent.clientX - startX) * scaleX;
+      const dy = (moveEvent.clientY - startY) * scaleY;
 
       const nextX = Math.max(0, Math.min(inst.renderedWidth, initialX + dx));
       const nextY = Math.max(0, Math.min(inst.renderedHeight, initialY + dy));
@@ -676,13 +770,19 @@ export default function CombinedPdfEditorPage() {
       setEraserInstances((prev) => prev.map((item) => (item.id === id ? { ...item, x: nextX, y: nextY } : item)));
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      document.removeEventListener('mousemove', handlePointerMove);
+      document.removeEventListener('mouseup', handlePointerUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerUp);
   };
 
   const launchEyeDropper = async () => {
@@ -859,7 +959,7 @@ export default function CombinedPdfEditorPage() {
   const selectedEraser = eraserInstances.find((e) => e.id === selectedEraserId);
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-8">
+    <main className={`mx-auto px-4 py-6 sm:px-6 transition-all duration-200 ${file ? 'w-full max-w-[1680px]' : 'max-w-5xl'}`}>
       <PageHeader
         icon="✍️"
         title="เขียนและลบข้อความ PDF"
@@ -884,7 +984,7 @@ export default function CombinedPdfEditorPage() {
         {file && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Sidebar Controls Panel */}
-            <div className="lg:col-span-4 space-y-4">
+            <div className="lg:col-span-4 xl:col-span-3 space-y-4">
               
               {/* Tool Selector & History */}
               <div className="bg-white border border-gray-200 rounded-xl p-5 space-y-4 shadow-sm">
@@ -1322,23 +1422,90 @@ export default function CombinedPdfEditorPage() {
             </div>
 
             {/* Pages workspace and PDF Rendering container */}
-            <div className="lg:col-span-8 flex flex-col items-center">
-              <div className="w-full bg-pink-50 border border-pink-100 text-pink-850 rounded-lg p-3.5 text-xs font-semibold text-center mb-5 shadow-sm leading-relaxed">
+            <div ref={containerRef} className="lg:col-span-8 xl:col-span-9 flex flex-col items-center w-full min-w-0">
+              <div className="w-full bg-pink-50 border border-pink-100 text-pink-850 rounded-lg p-3 text-xs font-semibold text-center mb-3 shadow-sm leading-relaxed">
                 {editorMode === 'text' ? (
-                  <p>✍️ **พิมพ์คำที่จะเขียน (ที่แผงด้านซ้าย)** แล้ว **คลิกจุดบนกระดาษ** เพื่อวางตัวอักษรลงในหน้านั้นๆ | ลากย้ายปรับเปลี่ยนสีและขนาดฟอนต์ภายหลังได้อิสระ</p>
+                  <p>✍️ **พิมพ์คำที่จะเขียน (ที่แผงควบคุม)** แล้ว **คลิก/แตะจุดบนกระดาษ** เพื่อวางตัวอักษรลงในหน้านั้นๆ | ลากย้ายปรับเปลี่ยนสีและขนาดฟอนต์ภายหลังได้อิสระ</p>
                 ) : editorMode === 'box' ? (
-                  <p>📐 **คลิกค้างแล้วลากเมาส์** บนกระดาษเพื่อ **ตีกรอบสี่เหลี่ยมยางลบ** ถมสีทับคำเดิม (คลิกกรอบเพื่อเลือกปรับความยาวความสูงได้ที่แถบด้านซ้าย)</p>
+                  <p>📐 **คลิกค้างแล้วลากเมาส์/นิ้ว** บนกระดาษเพื่อ **ตีกรอบสี่เหลี่ยมยางลบ** ถมสีทับคำเดิม (คลิกกรอบเพื่อเลือกปรับความยาวความสูงได้ที่แถบด้านซ้าย)</p>
                 ) : (
-                  <p>✏️ **คลิกค้างแล้ววาดลายเส้น** ทับข้อความ/รูปภาพเพื่อลบออกทันที (ปรับขนาดหัวแปรงยางลบดินสอได้ที่แผงควบคุมด้านซ้าย)</p>
+                  <p>✏️ **คลิกค้างแล้ววาดลายเส้น** ทับข้อความ/รูปภาพเพื่อลบออกทันที (ปรับขนาดหัวแปรงยางลบดินสอได้ที่แผงควบคุม)</p>
                 )}
               </div>
 
-              <div className="w-full max-h-[750px] overflow-y-auto pr-2 space-y-4">
+              {/* Zoom & View Control Toolbar */}
+              <div className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 mb-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    <span>🔍</span> มุมมอง:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setZoomMode('fit')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
+                      zoomMode === 'fit'
+                        ? 'bg-pink-50 border-pink-300 text-pink-700 shadow-xs'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="ปรับขนาดให้พอดีกับความกว้างหน้าจออัตโนมัติ (เหมาะกับมือถือและย่อจอ)"
+                  >
+                    📱 พอดีจอ (Fit Width)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoomMode('manual');
+                      setCustomScale(1.0);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
+                      zoomMode === 'manual' && customScale === 1.0
+                        ? 'bg-pink-50 border-pink-300 text-pink-700 shadow-xs'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="ขนาดมาตรฐาน 100%"
+                  >
+                    100%
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.max(0.35, Number((effectiveScale - 0.15).toFixed(2)));
+                      setZoomMode('manual');
+                      setCustomScale(next);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-sm cursor-pointer transition"
+                    title="ย่อขนาด"
+                  >
+                    −
+                  </button>
+                  <span className="text-xs font-mono font-bold text-gray-700 min-w-[50px] text-center">
+                    {Math.round(effectiveScale * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.min(2.5, Number((effectiveScale + 0.15).toFixed(2)));
+                      setZoomMode('manual');
+                      setCustomScale(next);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-sm cursor-pointer transition"
+                    title="ขยายขนาด"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="w-full max-h-[78vh] overflow-y-auto overflow-x-auto rounded-xl border border-gray-200 bg-gray-100/70 p-4 space-y-6">
                 {Array.from({ length: pageCount }, (_, i) => (
                   <EditablePage
                     key={i}
                     pageNumber={i + 1}
                     pdfDoc={pdfDoc}
+                    scale={effectiveScale}
                     textInstances={textInstances.filter((s) => s.pageIndex === i)}
                     eraserInstances={eraserInstances.filter((s) => s.pageIndex === i)}
                     eraserLines={eraserLines.filter((s) => s.pageIndex === i)}

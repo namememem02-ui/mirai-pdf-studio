@@ -17,7 +17,7 @@ describe('PageHeader', () => {
 
   afterEach(() => {
     cleanup();
-    window.location = originalLocation;
+    window.location = originalLocation as any;
     vi.restoreAllMocks();
   });
 

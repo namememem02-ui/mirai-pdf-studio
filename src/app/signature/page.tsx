@@ -25,17 +25,19 @@ interface SignatureInstance {
 interface EditablePageProps {
   pageNumber: number;
   pdfDoc: any;
+  scale: number;
   signatures: SignatureInstance[];
   activeSignature: string | null;
   onAddSignature: (pageIndex: number, x: number, y: number, renderedWidth: number, renderedHeight: number) => void;
   onUpdateSignatureWidth: (id: string, width: number) => void;
   onDeleteSignature: (id: string) => void;
-  onStartDrag: (e: React.MouseEvent, id: string) => void;
+  onStartDrag: (e: React.PointerEvent | React.MouseEvent, id: string, currentWidth: number, currentHeight: number) => void;
 }
 
 function EditablePage({
   pageNumber,
   pdfDoc,
+  scale,
   signatures,
   activeSignature,
   onAddSignature,
@@ -53,7 +55,7 @@ function EditablePage({
       setLoading(true);
       try {
         const page = await pdfDoc.getPage(pageNumber);
-        const viewport = page.getViewport({ scale: 1.25 });
+        const viewport = page.getViewport({ scale });
         if (!active) return;
         setDimensions({ width: viewport.width, height: viewport.height });
 
@@ -73,10 +75,15 @@ function EditablePage({
     return () => {
       active = false;
     };
-  }, [pdfDoc, pageNumber]);
+  }, [pdfDoc, pageNumber, scale]);
 
-  const handlePageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const handlePagePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!activeSignature) return; // Only add if we have an active signature selected
+    if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('[data-signature-item]')) return;
+
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -84,14 +91,18 @@ function EditablePage({
   };
 
   return (
-    <div className="flex flex-col items-center">
+    <div className="flex flex-col items-center select-none">
       <span className="text-xs text-gray-400 mb-2 font-semibold">หน้าที่ {pageNumber}</span>
       <div
-        className={`relative border border-gray-300 bg-white shadow-md select-none mb-8 ${
+        className={`relative border border-gray-300 bg-white shadow-md mb-8 ${
           activeSignature ? 'cursor-copy' : 'cursor-default'
         }`}
-        style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}
-        onClick={handlePageClick}
+        style={{
+          width: `${dimensions.width}px`,
+          height: `${dimensions.height}px`,
+          touchAction: activeSignature ? 'none' : 'auto',
+        }}
+        onPointerDown={handlePagePointerDown}
       >
         <canvas ref={canvasRef} className="absolute inset-0 pointer-events-none" />
 
@@ -101,53 +112,66 @@ function EditablePage({
           </div>
         )}
 
-        {signatures.map((sig) => (
-          <div
-            key={sig.id}
-            className="absolute border border-dashed border-purple-400 bg-white/40 p-1 rounded cursor-move group z-20"
-            style={{
-              left: `${sig.x}px`,
-              top: `${sig.y}px`,
-              width: `${sig.width}px`,
-              height: `${sig.height}px`,
-              transform: 'translate(-50%, -50%)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => onStartDrag(e, sig.id)}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={sig.dataUrl}
-              alt="ลายเซ็น"
-              className="w-full h-full object-contain pointer-events-none"
-            />
+        {signatures.map((sig) => {
+          const leftPct = (sig.x / sig.renderedWidth) * 100;
+          const topPct = (sig.y / sig.renderedHeight) * 100;
+          const widthPct = (sig.width / sig.renderedWidth) * 100;
+          const heightPct = (sig.height / sig.renderedHeight) * 100;
 
-            {/* Signature Control Panel */}
+          return (
             <div
-              className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-lg p-2 flex items-center gap-2.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-48"
-              onMouseDown={(e) => e.stopPropagation()}
+              key={sig.id}
+              data-signature-item="true"
+              className="absolute border border-dashed border-purple-400 bg-white/40 p-1 rounded cursor-move group z-20"
+              style={{
+                left: `${leftPct}%`,
+                top: `${topPct}%`,
+                width: `${widthPct}%`,
+                height: `${heightPct}%`,
+                transform: 'translate(-50%, -50%)',
+                touchAction: 'none',
+              }}
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                onStartDrag(e, sig.id, dimensions.width, dimensions.height);
+              }}
             >
-              <div className="flex-1 flex flex-col gap-0.5">
-                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">ขนาดกว้าง</span>
-                <input
-                  type="range"
-                  min="40"
-                  max="350"
-                  value={sig.width}
-                  onChange={(e) => onUpdateSignatureWidth(sig.id, parseInt(e.target.value) || 100)}
-                  className="w-full h-1 bg-gray-200 rounded-lg cursor-pointer accent-purple-600"
-                />
-              </div>
-              <button
-                onClick={() => onDeleteSignature(sig.id)}
-                className="text-xs text-red-500 hover:text-red-700 font-bold px-1.5 py-1 hover:bg-red-50 rounded"
-                title="ลบลายเซ็นนี้"
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={sig.dataUrl}
+                alt="ลายเซ็น"
+                className="w-full h-full object-contain pointer-events-none"
+              />
+
+              {/* Signature Control Panel */}
+              <div
+                className="absolute left-1/2 bottom-full mb-1.5 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-lg p-2 flex items-center gap-2.5 z-30 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition pointer-events-auto w-48"
+                onPointerDown={(e) => e.stopPropagation()}
               >
-                ✕
-              </button>
+                <div className="flex-1 flex flex-col gap-0.5">
+                  <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider">ขนาดกว้าง</span>
+                  <input
+                    type="range"
+                    min="40"
+                    max="350"
+                    value={sig.width}
+                    onChange={(e) => onUpdateSignatureWidth(sig.id, parseInt(e.target.value) || 100)}
+                    className="w-full h-1 bg-gray-200 rounded-lg cursor-pointer accent-purple-600"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onDeleteSignature(sig.id)}
+                  className="text-xs text-red-500 hover:text-red-700 font-bold px-1.5 py-1 hover:bg-red-50 rounded cursor-pointer"
+                  title="ลบลายเซ็นนี้"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -160,6 +184,42 @@ export default function SignaturePage() {
   const [pdfDoc, setPdfDoc] = useState<any>(null);
   const [pageCount, setPageCount] = useState(0);
   const [signatures, setSignatures] = useState<SignatureInstance[]>([]);
+
+  // Zoom and responsive scaling states
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+  const [basePageWidth, setBasePageWidth] = useState<number>(595.28);
+  const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
+  const [customScale, setCustomScale] = useState<number>(1.0);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setContainerWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [file]);
+
+  useEffect(() => {
+    if (!pdfDoc) return;
+    pdfDoc.getPage(1).then((page: any) => {
+      const vp = page.getViewport({ scale: 1.0 });
+      if (vp && vp.width > 0) {
+        setBasePageWidth(vp.width);
+      }
+    }).catch((err: any) => console.warn('Could not read base page width', err));
+  }, [pdfDoc]);
+
+  const fitScale = containerWidth > 0
+    ? Math.min(2.0, Math.max(0.35, Number(((containerWidth - 36) / (basePageWidth || 595.28)).toFixed(3))))
+    : 1.0;
+
+  const effectiveScale = zoomMode === 'fit' ? fitScale : customScale;
 
   // Signature creation states
   const [activeSignature, setActiveSignature] = useState<string | null>(null);
@@ -220,7 +280,7 @@ export default function SignaturePage() {
   };
 
   // Drawing pad drawing functions
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (e: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -233,7 +293,7 @@ export default function SignaturePage() {
     isDrawingRef.current = true;
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.PointerEvent<HTMLCanvasElement> | React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current) return;
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
@@ -348,7 +408,12 @@ export default function SignaturePage() {
     setDone(false);
   };
 
-  const handleStartDrag = (e: React.MouseEvent, id: string) => {
+  const handleStartDrag = (
+    e: React.PointerEvent | React.MouseEvent,
+    id: string,
+    currentWidth: number,
+    currentHeight: number
+  ) => {
     e.stopPropagation();
     e.preventDefault();
     const startX = e.clientX;
@@ -359,9 +424,12 @@ export default function SignaturePage() {
     const initialX = sig.x;
     const initialY = sig.y;
 
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      const dx = moveEvent.clientX - startX;
-      const dy = moveEvent.clientY - startY;
+    const scaleX = currentWidth > 0 ? sig.renderedWidth / currentWidth : 1;
+    const scaleY = currentHeight > 0 ? sig.renderedHeight / currentHeight : 1;
+
+    const handlePointerMove = (moveEvent: PointerEvent | MouseEvent) => {
+      const dx = (moveEvent.clientX - startX) * scaleX;
+      const dy = (moveEvent.clientY - startY) * scaleY;
 
       const nextX = Math.max(0, Math.min(sig.renderedWidth, initialX + dx));
       const nextY = Math.max(0, Math.min(sig.renderedHeight, initialY + dy));
@@ -371,13 +439,19 @@ export default function SignaturePage() {
       );
     };
 
-    const handleMouseUp = () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+      document.removeEventListener('mousemove', handlePointerMove);
+      document.removeEventListener('mouseup', handlePointerUp);
     };
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    document.addEventListener('mousemove', handlePointerMove);
+    document.addEventListener('mouseup', handlePointerUp);
   };
 
   const savePdf = async () => {
@@ -450,7 +524,7 @@ export default function SignaturePage() {
   };
 
   return (
-    <main className="max-w-5xl mx-auto px-4 py-8">
+    <main className={`mx-auto px-4 py-6 sm:px-6 transition-all duration-200 ${file ? 'w-full max-w-[1680px]' : 'max-w-5xl'}`}>
       <PageHeader
         icon="🖋️"
         title="เซ็นชื่อ PDF"
@@ -475,7 +549,7 @@ export default function SignaturePage() {
         {file && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             {/* Signature Creation Panel */}
-            <div className="bg-white border border-gray-200 rounded-xl p-5 lg:col-span-4 space-y-5 shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-xl p-5 lg:col-span-4 xl:col-span-3 space-y-5 shadow-sm">
               <span className="text-sm font-bold text-gray-700 block border-b border-gray-100 pb-2">
                 ✍️ สร้างและเลือกลายเซ็น
               </span>
@@ -508,10 +582,11 @@ export default function SignaturePage() {
                       width={300}
                       height={160}
                       className="w-full h-full bg-white cursor-pencil"
-                      onMouseDown={startDrawing}
-                      onMouseMove={draw}
-                      onMouseUp={stopDrawing}
-                      onMouseLeave={stopDrawing}
+                      style={{ touchAction: 'none' }}
+                      onPointerDown={startDrawing}
+                      onPointerMove={draw}
+                      onPointerUp={stopDrawing}
+                      onPointerLeave={stopDrawing}
                     />
                     <div className="absolute top-2 right-2 flex gap-1">
                       <button
@@ -584,21 +659,88 @@ export default function SignaturePage() {
             </div>
 
             {/* Preview and Stamper area */}
-            <div className="lg:col-span-8 flex flex-col items-center">
-              <div className="w-full bg-purple-50 text-purple-800 rounded-lg p-3.5 border border-purple-100 text-xs font-semibold text-center mb-5 shadow-sm leading-relaxed">
+            <div ref={containerRef} className="lg:col-span-8 xl:col-span-9 flex flex-col items-center w-full min-w-0">
+              <div className="w-full bg-purple-50 text-purple-800 rounded-lg p-3 border border-purple-100 text-xs font-semibold text-center mb-3 shadow-sm leading-relaxed">
                 {activeSignature ? (
-                  <p>👉 **แตะ/คลิกเมาส์** ตรงตำแหน่งใดก็ได้บนหน้าพรีวิวด้านล่าง เพื่อ **ประทับลายเซ็น** | ลากย้ายตำแหน่ง หรือโฮเวอร์เพื่อย่อขยายขนาดได้อิสระ</p>
+                  <p>👉 **แตะ/คลิก** ตรงตำแหน่งใดก็ได้บนหน้าพรีวิวด้านล่าง เพื่อ **ประทับลายเซ็น** | ลากย้ายตำแหน่ง หรือโฮเวอร์เพื่อย่อขยายขนาดได้อิสระ</p>
                 ) : (
                   <p>💡 กรุณาสร้างหรือเลือกลายเซ็นจากแผงควบคุมด้านซ้ายก่อนเริ่มเซ็นชื่อบนหน้าเอกสาร</p>
                 )}
               </div>
 
-              <div className="w-full max-h-[750px] overflow-y-auto pr-2 space-y-4">
+              {/* Zoom & View Control Toolbar */}
+              <div className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 mb-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-gray-700 flex items-center gap-1.5">
+                    <span>🔍</span> มุมมอง:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setZoomMode('fit')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
+                      zoomMode === 'fit'
+                        ? 'bg-purple-50 border-purple-300 text-purple-700 shadow-xs'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="ปรับขนาดให้พอดีกับความกว้างหน้าจออัตโนมัติ (เหมาะกับมือถือและย่อจอ)"
+                  >
+                    📱 พอดีจอ (Fit Width)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setZoomMode('manual');
+                      setCustomScale(1.0);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 cursor-pointer border ${
+                      zoomMode === 'manual' && customScale === 1.0
+                        ? 'bg-purple-50 border-purple-300 text-purple-700 shadow-xs'
+                        : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
+                    }`}
+                    title="ขนาดมาตรฐาน 100%"
+                  >
+                    100%
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-1.5 bg-gray-50 border border-gray-200 rounded-lg p-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.max(0.35, Number((effectiveScale - 0.15).toFixed(2)));
+                      setZoomMode('manual');
+                      setCustomScale(next);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-sm cursor-pointer transition"
+                    title="ย่อขนาด"
+                  >
+                    −
+                  </button>
+                  <span className="text-xs font-mono font-bold text-gray-700 min-w-[50px] text-center">
+                    {Math.round(effectiveScale * 100)}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = Math.min(2.5, Number((effectiveScale + 0.15).toFixed(2)));
+                      setZoomMode('manual');
+                      setCustomScale(next);
+                    }}
+                    className="w-7 h-7 flex items-center justify-center rounded bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold text-sm cursor-pointer transition"
+                    title="ขยายขนาด"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              <div className="w-full max-h-[78vh] overflow-y-auto overflow-x-auto rounded-xl border border-gray-200 bg-gray-100/70 p-4 space-y-6">
                 {Array.from({ length: pageCount }, (_, i) => (
                   <EditablePage
                     key={i}
                     pageNumber={i + 1}
                     pdfDoc={pdfDoc}
+                    scale={effectiveScale}
                     signatures={signatures.filter((s) => s.pageIndex === i)}
                     activeSignature={activeSignature}
                     onAddSignature={handleAddSignature}
